@@ -1,9 +1,11 @@
 import {createEmitter, type Emitter, type KeyedEventMap} from 'radiate';
 import {create} from 'patch-recorder';
 
-export const mutativeAdapter: (createFromMutative: any) => CreateFunction =
-	(createFromMutative) => (state, mutate) =>
-		createFromMutative(state, mutate, {enablePatches: true});
+export function mutativeAdapter(createFromMutative: any): CreateFunction {
+	return (state, mutate) => {
+		return createFromMutative(state, mutate, {enablePatches: true});
+	};
+}
 
 const createFromRecorder = mutativeAdapter(create);
 

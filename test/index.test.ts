@@ -1,7 +1,5 @@
 import {describe, it, expect, vi} from 'vitest';
-import {create} from 'mutative';
-import storeFactory, {mutativeAdapter} from '../src/index.js';
-const createObservableStore = storeFactory(mutativeAdapter(create));
+import {createObservableStore} from '../src/index.js';
 
 describe('ObservableStore', () => {
 	describe('Basic functionality', () => {
@@ -353,10 +351,12 @@ describe('ObservableStore', () => {
 				name: {value: 'test'},
 			});
 
-			// @ts-expect-error - Invalid field name
-			store.update('invalid', (draft) => {
-				// This should cause a type error
-			});
+			expect(() =>
+				// @ts-expect-error - Invalid field name
+				store.update('invalid', (draft) => {
+					// This should cause a type error
+				}),
+			).toThrowError();
 		});
 
 		it('should only accept valid event names in on', () => {
