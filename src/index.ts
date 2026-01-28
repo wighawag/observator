@@ -1,4 +1,12 @@
 import {createEmitter, type Emitter, type KeyedEventMap} from 'radiate';
+import {create} from 'patch-recorder';
+
+export const mutativeAdapter: (createFromMutative: any) => CreateFunction =
+	(createFromMutative) => (state, mutate) =>
+		createFromMutative(state, mutate, {enablePatches: true});
+
+const createFromRecorder = mutativeAdapter(create);
+
 import {
 	CreateFunction,
 	Draft,
@@ -12,6 +20,7 @@ import {
 	Patches,
 	SubscriptionsMap,
 } from './types.js';
+
 /**
  * Type-safe observable store that emits events for each top-level field change.
  *
@@ -55,7 +64,7 @@ export class ObservableStore<T extends Record<string, NonPrimitive>> {
 
 	constructor(
 		protected state: T,
-		protected create: CreateFunction,
+		protected create: CreateFunction = createFromRecorder,
 	) {
 		this.emitter = createEmitter();
 		this.subscriptions = this.createSubscribeHandlers();
@@ -428,16 +437,12 @@ export class ObservableStore<T extends Record<string, NonPrimitive>> {
  */
 export function createObservableStore<T extends Record<string, NonPrimitive>>(
 	state: T,
-	create: CreateFunction,
+	create?: CreateFunction,
 ): ObservableStore<T> {
 	return new ObservableStore(state, create);
 }
 
-export const mutativeAdapter: (createFromMutative: any) => CreateFunction =
-	(createFromMutative) => (state, mutate) =>
-		createFromMutative(state, mutate, {enablePatches: true});
-
-export default function createObservableStoreFactory(create: CreateFunction) {
+export function createObservableStoreFactory(create: CreateFunction) {
 	return function createObservableStore<T extends Record<string, NonPrimitive>>(
 		state: T,
 	): ObservableStore<T> {

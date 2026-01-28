@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      patch-recorder:
+        specifier: ^0.1.0
+        version: 0.1.0
       radiate:
         specifier: ^0.3.1
         version: 0.3.1
@@ -18,9 +21,6 @@ importers:
       mutative:
         specifier: ^1.3.0
         version: 1.3.0
-      patch-recorder:
-        specifier: ^0.0.1
-        version: 0.0.1
       prettier:
         specifier: ^3.8.0
         version: 3.8.1
@@ -681,8 +681,8 @@ packages:
   node-addon-api@7.1.1:
     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
 
-  patch-recorder@0.0.1:
-    resolution: {integrity: sha512-p6+4EXWXCuFlwWDxVDxob2Td39OnVqfCDxSYg1/bq8bXdIyK9nSCgBqY287u4dArkdJC2W/IMzTdrRAJ0hhZ/A==}
+  patch-recorder@0.1.0:
+    resolution: {integrity: sha512-fQPWE0+inN/klps78ogVpq0r89NjCpULm8oA3klaJNY/S+/C4kE3vBNrjR//cKb8P+cNG24U/83PRmftn/JYUQ==}
 
   pathe@1.1.2:
     resolution: {integrity: sha512-whLdWMYL2TwI08hn8/ZqAbrVemu0LNaNNJZX73O6qaIdCTfXutsLhMkjdENX0qhsQ9uIimo4/aQOmXkoon2nDQ==}
@@ -1282,7 +1282,7 @@ snapshots:
 
   node-addon-api@7.1.1: {}
 
-  patch-recorder@0.0.1: {}
+  patch-recorder@0.1.0: {}
 
   pathe@1.1.2: {}
 
