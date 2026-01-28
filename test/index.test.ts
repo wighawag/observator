@@ -1274,11 +1274,14 @@ describe('ObservableStore', () => {
 				counter: {value: 0},
 			});
 
-			const callback = vi.fn();
-			store.subscriptions.counter(callback);
+			// Record values as they are received (capturing snapshots at call time)
+			const recordedValues: Array<{value: number}> = [];
+			store.subscriptions.counter((v) => {
+				recordedValues.push({...v});
+			});
 
-			// Reset after initial call
-			callback.mockClear();
+			// Skip the initial call (value: 0)
+			recordedValues.length = 0;
 
 			// Rapid updates
 			for (let i = 1; i <= 10; i++) {
@@ -1287,9 +1290,10 @@ describe('ObservableStore', () => {
 				});
 			}
 
-			expect(callback).toHaveBeenCalledTimes(10);
+			expect(recordedValues).toHaveLength(10);
+			// Verify each value was received correctly
 			for (let i = 1; i <= 10; i++) {
-				expect(callback).toHaveBeenNthCalledWith(i, {value: i});
+				expect(recordedValues[i - 1]).toEqual({value: i});
 			}
 		});
 
