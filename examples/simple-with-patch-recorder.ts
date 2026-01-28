@@ -1,4 +1,4 @@
-import {create} from 'mutative';
+import {create} from 'patch-recorder';
 import storeFactory, {mutativeAdapter} from '../src/index.js';
 const createObservableStore = storeFactory(mutativeAdapter(create));
 

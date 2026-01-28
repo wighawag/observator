@@ -1,4 +1,6 @@
-import {createObservableStore} from '../src/index';
+import {create} from 'mutative';
+import storeFactory, {mutativeAdapter} from '../src/index.js';
+const createObservableStore = storeFactory(mutativeAdapter(create));
 
 /**
  * Example demonstrating the subscribe API

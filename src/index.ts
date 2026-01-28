@@ -1,6 +1,7 @@
-import {create, type Draft, type Patches} from 'mutative';
 import {createEmitter, type Emitter, type KeyedEventMap} from 'radiate';
 import {
+	CreateFunction,
+	Draft,
 	EventName,
 	EventNames,
 	ExtractKeyType,
@@ -8,9 +9,9 @@ import {
 	KeyedObservableEventMap,
 	KeyedSubscriptionsMap,
 	NonPrimitive,
+	Patches,
 	SubscriptionsMap,
 } from './types.js';
-
 /**
  * Type-safe observable store that emits events for each top-level field change.
  *
@@ -52,7 +53,10 @@ export class ObservableStore<T extends Record<string, NonPrimitive>> {
 	public subscriptions: SubscriptionsMap<T>;
 	public keyedSubscriptions: KeyedSubscriptionsMap<T>;
 
-	constructor(protected state: T) {
+	constructor(
+		protected state: T,
+		protected create: CreateFunction,
+	) {
 		this.emitter = createEmitter();
 		this.subscriptions = this.createSubscribeHandlers();
 		this.keyedSubscriptions = this.createKeyedSubscribeHandlers();
@@ -72,9 +76,7 @@ export class ObservableStore<T extends Record<string, NonPrimitive>> {
 	 * ```
 	 */
 	public update<K extends keyof T>(key: K, mutate: (draft: Draft<T[K]>) => void): void {
-		const [newState, patches] = create(this.state[key], mutate, {
-			enablePatches: true,
-		});
+		const [newState, patches] = this.create(this.state[key], mutate);
 		this.state[key] = newState;
 
 		const eventName = `${String(key)}:updated` as EventNames<T>;
@@ -426,6 +428,19 @@ export class ObservableStore<T extends Record<string, NonPrimitive>> {
  */
 export function createObservableStore<T extends Record<string, NonPrimitive>>(
 	state: T,
+	create: CreateFunction,
 ): ObservableStore<T> {
-	return new ObservableStore(state);
+	return new ObservableStore(state, create);
+}
+
+export const mutativeAdapter: (createFromMutative: any) => CreateFunction =
+	(createFromMutative) => (state, mutate) =>
+		createFromMutative(state, mutate, {enablePatches: true});
+
+export default function createObservableStoreFactory(create: CreateFunction) {
+	return function createObservableStore<T extends Record<string, NonPrimitive>>(
+		state: T,
+	): ObservableStore<T> {
+		return new ObservableStore(state, create);
+	};
 }

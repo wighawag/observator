@@ -1,5 +1,7 @@
-import {Patches} from 'mutative';
-import {createObservableStore} from '../src';
+import type {Patches} from '../src/types.js';
+import {create} from 'mutative';
+import storeFactory, {mutativeAdapter} from '../src/index.js';
+const createObservableStore = storeFactory(mutativeAdapter(create));
 
 // Example 1: User management with keyed events
 console.log('=== Example 1: User Management ===');

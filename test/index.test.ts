@@ -1,5 +1,7 @@
 import {describe, it, expect, vi} from 'vitest';
-import {createObservableStore} from '../src/index';
+import {create} from 'mutative';
+import storeFactory, {mutativeAdapter} from '../src/index.js';
+const createObservableStore = storeFactory(mutativeAdapter(create));
 
 describe('ObservableStore', () => {
 	describe('Basic functionality', () => {

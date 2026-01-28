@@ -1,15 +1,16 @@
 # observe-store
 
-A type-safe store that emits events for each top-level field change using [mutative](https://github.com/unadlib/mutative) for change tracking and [radiate](https://github.com/wighawag/radiate) for type-safe event emission.
+A type-safe store that emits events for each top-level field change. The library is **agnostic to the patch generation mechanism** - you can use any library that supports immutable updates with JSON Patch generation (e.g., mutative, immer, or patch-recorder). Uses [radiate](https://github.com/wighawag/radiate) for type-safe event emission.
 
 ## Features
 
 - 🔒 **Type-safe event names** - Only valid field names can be used for updates and subscriptions
-- 📝 **Patches included** - Event callbacks receive [JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902) arrays from mutative
+- 📝 **Patches included** - Event callbacks receive [JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902) arrays
+- 🎯 **Patch mechanism agnostic** - Use any patch generation library (mutative, immer, patch-recorder, etc.)
 - 🎯 **Fine-grained subscriptions** - Subscribe to specific keys within Record/Map fields using keyed events
 - 💡 **Value-based subscriptions** - Use the convenient `subscribe` API to receive current values immediately and on every change
 - 🎯 **Minimal events** - Events are emitted only for the specific field being updated
-- 📦 **Minimal dependencies** - Only depends on `mutative` and `radiate`
+- 📦 **Minimal dependencies** - Only depends on `radiate`
 - 🚀 **Lightweight** - Small footprint with powerful features
 
 ## Installation
@@ -22,20 +23,60 @@ pnpm add observe-store
 yarn add observe-store
 ```
 
+You'll also need to install a patch generation library of your choice. For example:
+
+```bash
+# Using mutative
+npm install mutative
+
+# Using immer
+npm install immer
+
+# Using patch-recorder (best performance but keep references)
+npm install patch-recorder
+```
+
 > **Note:** The package name `observe-store` is kept for backwards compatibility. The library is now called `ObservableStore`.
 
 ## Important: Non-Primitive Type Constraint
 
 **Note:** Top-level fields must be objects or arrays, not primitives. For primitive values (numbers, strings, booleans), wrap them in an object.
 
-This is because `mutative` requires objects or arrays to generate patches properly.
+This is because patch generation libraries require objects or arrays to generate patches properly.
 
 ## Usage
+
+### Canonical Usage
+
+The canonical way to use `observe-store` is to import the **default export**, which is a factory function that creates a `createObservableStore` function configured with your chosen patch generation mechanism.
+
+```typescript
+import createObservableStoreFactory from 'observe-store';
+
+// Using mutative
+import {create} from 'mutative';
+
+const createObservableStore = createObservableStoreFactory((state, mutate) =>
+  create(state, mutate, {enablePatches: true}),
+);
+
+// Using patch-recorder
+import {create} from 'patch-recorder';
+
+const createObservableStore = createObservableStoreFactory((state, mutate) =>
+  create(state, mutate, {enablePatches: true}),
+);
+```
 
 ### Basic Example with Primitives (Wrapped)
 
 ```typescript
-import { createObservableStore } from 'observe-store';
+import createObservableStoreFactory from 'observe-store';
+import {create} from 'mutative';
+
+const createObservableStore = createObservableStoreFactory((state, mutate) =>
+  create(state, mutate, {enablePatches: true}),
+);
 
 type State = {
   counter: { value: number };
@@ -64,7 +105,12 @@ console.log(store.get('counter')); // { value: 1 }
 ### Example with Complex Objects
 
 ```typescript
-import { createObservableStore } from 'observe-store';
+import createObservableStoreFactory from 'observe-store';
+import {create} from 'mutative';
+
+const createObservableStore = createObservableStoreFactory((state, mutate) =>
+  create(state, mutate, {enablePatches: true}),
+);
 
 type State = {
   user: {
@@ -126,7 +172,12 @@ The `subscribe` API provides a convenient way to subscribe to field values. Unli
 - **Returns an unsubscribe function** for easy cleanup
 
 ```typescript
-import { createObservableStore } from 'observe-store';
+import createObservableStoreFactory from 'observe-store';
+import {create} from 'mutative';
+
+const createObservableStore = createObservableStoreFactory((state, mutate) =>
+  create(state, mutate, {enablePatches: true}),
+);
 
 type State = {
   counter: { value: number };
@@ -192,7 +243,12 @@ store.subscribe.counter((counter) => {
 ### Example with Arrays
 
 ```typescript
-import { createObservableStore } from 'observe-store';
+import createObservableStoreFactory from 'observe-store';
+import {create} from 'mutative';
+
+const createObservableStore = createObservableStoreFactory((state, mutate) =>
+  create(state, mutate, {enablePatches: true}),
+);
 
 type State = {
   items: number[];
@@ -228,7 +284,12 @@ store.update('todos', (draft) => {
 For fields containing records or arrays, you can subscribe to changes for specific keys:
 
 ```typescript
-import { createObservableStore } from 'observe-store';
+import createObservableStoreFactory from 'observe-store';
+import {create} from 'mutative';
+
+const createObservableStore = createObservableStoreFactory((state, mutate) =>
+  create(state, mutate, {enablePatches: true}),
+);
 
 type State = {
   users: Record<string, { name: string; email: string }>;
@@ -354,7 +415,12 @@ store.update('users', (draft) => {
 ### Multiple Subscribers
 
 ```typescript
-import { createObservableStore } from 'observe-store';
+import createObservableStoreFactory from 'observe-store';
+import {create} from 'mutative';
+
+const createObservableStore = createObservableStoreFactory((state, mutate) =>
+  create(state, mutate, {enablePatches: true}),
+);
 
 type State = {
   count: { value: number };
@@ -386,7 +452,12 @@ store.update('count', (draft) => {
 ### Get Entire State
 
 ```typescript
-import { createObservableStore } from 'observe-store';
+import createObservableStoreFactory from 'observe-store';
+import {create} from 'mutative';
+
+const createObservableStore = createObservableStoreFactory((state, mutate) =>
+  create(state, mutate, {enablePatches: true}),
+);
 
 type State = {
   user: { name: string };
@@ -410,9 +481,34 @@ console.log(store.get('counter')); // Still { value: 0 }
 
 ## API
 
+### `createObservableStoreFactory(create: CreateFunction): <T>(state: T) => ObservableStore<T>`
+
+Creates a factory function for creating ObservableStore instances with a specific patch generation mechanism.
+
+**Parameters:**
+- `create` - A function that takes `(state: S, mutate: (draft: Draft<S>) => void)` and returns `[newState: S, patches: Patches<true>]`
+
+**Returns:**
+- A `createObservableStore` function that creates `ObservableStore<T>` instances
+
+**Example:**
+```typescript
+import createObservableStoreFactory from 'observe-store';
+import {create} from 'mutative';
+
+const createObservableStore = createObservableStoreFactory((state, mutate) =>
+  create(state, mutate, {enablePatches: true}),
+);
+
+const store = createObservableStore({
+  user: { name: 'John' },
+  counter: { value: 0 }
+});
+```
+
 ### `createObservableStore<T>(state: T): ObservableStore<T>`
 
-Creates a new ObservableStore instance with the given initial state.
+The function returned by `createObservableStoreFactory`. Creates a new ObservableStore instance with the given initial state.
 
 **Type Parameter:**
 - `T` - The state type, must be `Record<string, object | Array<any>>`
@@ -750,7 +846,7 @@ store.update('users', (draft) => {
 // Both regular and keyed events are emitted
 ```
 
-**Note:** Numeric keys in Record objects are converted to strings by mutative in patch paths, so subscribe using the string version of the key.
+**Note:** Numeric keys in Record objects are converted to strings by most patch generation libraries in patch paths, so subscribe using the string version of the key.
 
 ## Working with Primitives
 
@@ -793,7 +889,12 @@ store.update('count', (draft) => {
 
 ## Understanding Patches
 
-Patches follow the [JSON Patch (RFC 6902)](https://datatracker.ietf.org/doc/html/rfc6902) format:
+Patches follow the [JSON Patch (RFC 6902)](https://datatracker.ietf.org/doc/html/rfc6902) format. The exact patch format depends on the patch generation library you choose:
+
+- **mutative**: Generates high-performance JSON patches with array optimizations
+- **immer**: Generates standard JSON patches
+- **patch-recorder**: Generates patches with minimal overhead but keep references
+
 
 ```typescript
 store.on('user:updated', (patches) => {
