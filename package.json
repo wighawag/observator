@@ -59,7 +59,7 @@
 		"format:check": "prettier --check .",
 		"build": "tsc",
 		"dev": "as-soon -w src pnpm build",
-		"test": "vitest",
-		"test:run": "vitest run"
+		"test": "vitest run",
+		"test:watch": "vitest"
 	}
 }

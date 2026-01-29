@@ -12,7 +12,7 @@ export type EventName<K extends string> = `${K}:updated`;
  * Extract event names from state type
  * @example EventNames<{ a: string, b: number }> // 'a:updated' | 'b:updated'
  */
-export type EventNames<T extends Record<string, NonPrimitive>> = {
+export type EventNames<T extends Record<string, unknown>> = {
 	[K in keyof T]: EventName<K & string>;
 }[keyof T];
 
@@ -39,7 +39,7 @@ export type ExtractKeyType<T> =
  * Keyed event map type for fine-grained subscriptions
  * Maps event names to their key and patch data structure
  */
-export type KeyedObservableEventMap<T extends Record<string, NonPrimitive>> = KeyedEventMap<{
+export type KeyedObservableEventMap<T extends Record<string, unknown>> = KeyedEventMap<{
 	[K in keyof T as EventName<K & string>]: {
 		id: ExtractKeyType<T[K]>;
 		data: Patches;
@@ -63,7 +63,7 @@ export type KeyedObservableEventMap<T extends Record<string, NonPrimitive>> = Ke
  * // }
  * ```
  */
-export type SubscriptionsMap<T extends Record<string, NonPrimitive>> = {
+export type SubscriptionsMap<T extends Record<string, unknown>> = {
 	[K in keyof T]: (callback: (value: Readonly<T[K]>) => void) => () => void;
 };
 
@@ -86,7 +86,7 @@ export type SubscriptionsMap<T extends Record<string, NonPrimitive>> = {
  * // }
  * ```
  */
-export type KeyedSubscriptionsMap<T extends Record<string, NonPrimitive>> = {
+export type KeyedSubscriptionsMap<T extends Record<string, unknown>> = {
 	[K in keyof T]: {
 		(key: ExtractKeyType<T[K]>): (callback: (value: Readonly<T[K]>) => void) => () => void;
 	};

@@ -1,5 +1,6 @@
 import {describe, it, expect, vi} from 'vitest';
 import {createObservableStore} from '../src/index.js';
+import {PatchPath} from '../src/types.js';
 
 describe('ObservableStore', () => {
 	describe('Basic functionality', () => {
@@ -38,28 +39,30 @@ describe('ObservableStore', () => {
 	describe('Update functionality', () => {
 		it('should update a field and emit event', () => {
 			type State = {
-				count: {value: number};
-				name: {value: string};
+				count: number;
+				name: string;
 			};
 
 			const store = createObservableStore<State>({
-				count: {value: 0},
-				name: {value: 'test'},
+				count: 0,
+				name: 'test',
 			});
 
 			const callback = vi.fn();
 			store.on('count:updated', callback);
 
-			store.update('count', (draft) => {
-				draft.value += 1;
-			});
+			console.log(
+				store.update((draft) => {
+					draft.count += 1;
+				}),
+			);
 
-			expect(store.get('count')).toEqual({value: 1});
+			expect(store.get('count')).toEqual(1);
 			expect(callback).toHaveBeenCalledTimes(1);
 			expect(callback).toHaveBeenCalledWith([
 				{
 					op: 'replace',
-					path: ['value'],
+					path: ['count'],
 					value: 1,
 				},
 			]);
@@ -80,9 +83,9 @@ describe('ObservableStore', () => {
 			const callback = vi.fn();
 			store.on('user:updated', callback);
 
-			store.update('user', (draft) => {
-				draft.name = 'Jane';
-				draft.age = 31;
+			store.update((draft) => {
+				draft.user.name = 'Jane';
+				draft.user.age = 31;
 			});
 
 			expect(store.get('user')).toEqual({name: 'Jane', age: 31});
@@ -91,12 +94,12 @@ describe('ObservableStore', () => {
 			expect(patches).toHaveLength(2);
 			expect(patches[0]).toEqual({
 				op: 'replace',
-				path: ['name'],
+				path: ['user', 'name'],
 				value: 'Jane',
 			});
 			expect(patches[1]).toEqual({
 				op: 'replace',
-				path: ['age'],
+				path: ['user', 'age'],
 				value: 31,
 			});
 		});
@@ -113,8 +116,8 @@ describe('ObservableStore', () => {
 			const callback = vi.fn();
 			store.on('items:updated', callback);
 
-			store.update('items', (draft) => {
-				draft.push(4);
+			store.update((draft) => {
+				draft.items.push(4);
 			});
 
 			expect(store.get('items')).toEqual([1, 2, 3, 4]);
@@ -133,11 +136,11 @@ describe('ObservableStore', () => {
 			const callback = vi.fn();
 			store.on('count:updated', callback);
 
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
 
 			expect(store.get('count')).toEqual({value: 2});
@@ -161,17 +164,45 @@ describe('ObservableStore', () => {
 			store.on('count:updated', countCallback);
 			store.on('name:updated', nameCallback);
 
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
 
 			expect(countCallback).toHaveBeenCalledTimes(1);
 			expect(nameCallback).toHaveBeenCalledTimes(0);
 
-			store.update('name', (draft) => {
-				draft.value = 'updated';
+			store.update((draft) => {
+				draft.name.value = 'updated';
 			});
 
+			expect(countCallback).toHaveBeenCalledTimes(1);
+			expect(nameCallback).toHaveBeenCalledTimes(1);
+		});
+
+		it('should update multiple fields in single update call', () => {
+			type State = {
+				count: {value: number};
+				name: {value: string};
+			};
+
+			const store = createObservableStore<State>({
+				count: {value: 0},
+				name: {value: 'test'},
+			});
+
+			const countCallback = vi.fn();
+			const nameCallback = vi.fn();
+
+			store.on('count:updated', countCallback);
+			store.on('name:updated', nameCallback);
+
+			store.update((draft) => {
+				draft.count.value += 1;
+				draft.name.value = 'updated';
+			});
+
+			expect(store.get('count')).toEqual({value: 1});
+			expect(store.get('name')).toEqual({value: 'updated'});
 			expect(countCallback).toHaveBeenCalledTimes(1);
 			expect(nameCallback).toHaveBeenCalledTimes(1);
 		});
@@ -193,8 +224,8 @@ describe('ObservableStore', () => {
 			store.on('count:updated', callback1);
 			store.on('count:updated', callback2);
 
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
 
 			expect(callback1).toHaveBeenCalledTimes(1);
@@ -213,16 +244,16 @@ describe('ObservableStore', () => {
 			const callback = vi.fn();
 			const unsubscribe = store.on('count:updated', callback);
 
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
 
 			expect(callback).toHaveBeenCalledTimes(1);
 
 			unsubscribe();
 
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
 
 			expect(callback).toHaveBeenCalledTimes(1);
@@ -243,8 +274,8 @@ describe('ObservableStore', () => {
 			store.on('count:updated', callback1);
 			store.on('count:updated', callback2);
 
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
 
 			expect(callback1).toHaveBeenCalledTimes(1);
@@ -252,8 +283,8 @@ describe('ObservableStore', () => {
 
 			store.off('count:updated', callback1);
 
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
 
 			expect(callback1).toHaveBeenCalledTimes(1); // Unsubscribed
@@ -272,14 +303,14 @@ describe('ObservableStore', () => {
 			const callback = vi.fn();
 			store.once('count:updated', callback);
 
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
 
 			expect(callback).toHaveBeenCalledTimes(1);
 
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
 
 			expect(callback).toHaveBeenCalledTimes(1); // Still only once
@@ -299,8 +330,8 @@ describe('ObservableStore', () => {
 
 			unsubscribe();
 
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
 
 			expect(callback).toHaveBeenCalledTimes(0);
@@ -325,14 +356,14 @@ describe('ObservableStore', () => {
 			store.on('name:updated', allCallback);
 			store.on('flag:updated', allCallback);
 
-			store.update('count', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.count.value += 1;
 			});
-			store.update('name', (draft) => {
-				draft.value = 'updated';
+			store.update((draft) => {
+				draft.name.value = 'updated';
 			});
-			store.update('flag', (draft) => {
-				draft.value = true;
+			store.update((draft) => {
+				draft.flag.value = true;
 			});
 
 			expect(allCallback).toHaveBeenCalledTimes(3);
@@ -340,25 +371,6 @@ describe('ObservableStore', () => {
 	});
 
 	describe('Type safety', () => {
-		it('should only accept valid field names in update', () => {
-			type State = {
-				count: {value: number};
-				name: {value: string};
-			};
-
-			const store = createObservableStore<State>({
-				count: {value: 0},
-				name: {value: 'test'},
-			});
-
-			expect(() =>
-				// @ts-expect-error - Invalid field name
-				store.update('invalid', (draft) => {
-					// This should cause a type error
-				}),
-			).toThrowError();
-		});
-
 		it('should only accept valid event names in on', () => {
 			type State = {
 				count: {value: number};
@@ -396,11 +408,7 @@ describe('ObservableStore', () => {
 
 		it('should prevent primitive types at top level', () => {
 			// @ts-expect-error - Primitive type not allowed
-			const store = createObservableStore<{
-				count: number;
-			}>({
-				count: 0,
-			});
+			const store = createObservableStore<number>(0);
 		});
 	});
 
@@ -417,7 +425,7 @@ describe('ObservableStore', () => {
 			const callback = vi.fn();
 			store.on('count:updated', callback);
 
-			store.update('count', (draft) => {
+			store.update((draft) => {
 				// No changes
 			});
 
@@ -450,9 +458,9 @@ describe('ObservableStore', () => {
 			const callback = vi.fn();
 			store.on('data:updated', callback);
 
-			store.update('data', (draft) => {
-				draft.users.byId['2'] = {name: 'Jane', email: 'jane@example.com'};
-				draft.users.ids.push('2');
+			store.update((draft) => {
+				draft.data.users.byId['2'] = {name: 'Jane', email: 'jane@example.com'};
+				draft.data.users.ids.push('2');
 			});
 
 			expect(store.get('data').users.ids).toHaveLength(2);
@@ -471,8 +479,8 @@ describe('ObservableStore', () => {
 			const callback = vi.fn();
 			store.on('items:updated', callback);
 
-			store.update('items', (draft) => {
-				delete draft.b;
+			store.update((draft) => {
+				delete draft.items.b;
 			});
 
 			expect(store.get('items')).toEqual({a: 1, c: 3});
@@ -480,7 +488,8 @@ describe('ObservableStore', () => {
 			const patches = callback.mock.calls[0][0];
 			expect(
 				patches.some(
-					(p: {op: string; path?: (string | number)[]}) => p.op === 'remove' && p.path?.[0] === 'b',
+					(p: {op: string; path?: PatchPath}) =>
+						p.op === 'remove' && p.path?.[0] === 'items' && p.path?.[1] === 'b',
 				),
 			).toBe(true);
 		});
@@ -501,8 +510,8 @@ describe('ObservableStore', () => {
 				const callback = vi.fn();
 				store.onKeyed('users:updated', 'user-1', callback);
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'Johnny';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'Johnny';
 				});
 
 				expect(callback).toHaveBeenCalledTimes(1);
@@ -510,7 +519,7 @@ describe('ObservableStore', () => {
 				expect(patches).toEqual([
 					{
 						op: 'replace',
-						path: ['user-1', 'name'],
+						path: ['users', 'user-1', 'name'],
 						value: 'Johnny',
 					},
 				]);
@@ -531,8 +540,8 @@ describe('ObservableStore', () => {
 				const callback = vi.fn();
 				store.onKeyed('users:updated', 'user-1', callback);
 
-				store.update('users', (draft) => {
-					draft['user-2'].name = 'Janet';
+				store.update((draft) => {
+					draft.users['user-2'].name = 'Janet';
 				});
 
 				expect(callback).toHaveBeenCalledTimes(0);
@@ -555,12 +564,12 @@ describe('ObservableStore', () => {
 					callback(key, patches);
 				});
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'Johnny';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'Johnny';
 				});
 
-				store.update('users', (draft) => {
-					draft['user-2'].name = 'Janet';
+				store.update((draft) => {
+					draft.users['user-2'].name = 'Janet';
 				});
 
 				expect(callback).toHaveBeenCalledTimes(2);
@@ -585,8 +594,8 @@ describe('ObservableStore', () => {
 				store.onKeyed('users:updated', 'user-1', callback1);
 				store.onKeyed('users:updated', 'user-1', callback2);
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'Johnny';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'Johnny';
 				});
 
 				expect(callback1).toHaveBeenCalledTimes(1);
@@ -607,16 +616,16 @@ describe('ObservableStore', () => {
 				const callback = vi.fn();
 				const unsubscribe = store.onKeyed('users:updated', 'user-1', callback);
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'Johnny';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'Johnny';
 				});
 
 				expect(callback).toHaveBeenCalledTimes(1);
 
 				unsubscribe();
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'John';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'John';
 				});
 
 				expect(callback).toHaveBeenCalledTimes(1);
@@ -636,14 +645,14 @@ describe('ObservableStore', () => {
 				const callback = vi.fn();
 				store.onceKeyed('users:updated', 'user-1', callback);
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'Johnny';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'Johnny';
 				});
 
 				expect(callback).toHaveBeenCalledTimes(1);
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'John';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'John';
 				});
 
 				expect(callback).toHaveBeenCalledTimes(1); // Still only once
@@ -666,12 +675,12 @@ describe('ObservableStore', () => {
 					callback(key, patches);
 				});
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'Johnny';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'Johnny';
 				});
 
-				store.update('users', (draft) => {
-					draft['user-2'].name = 'Janet';
+				store.update((draft) => {
+					draft.users['user-2'].name = 'Janet';
 				});
 
 				expect(callback).toHaveBeenCalledTimes(1);
@@ -694,8 +703,8 @@ describe('ObservableStore', () => {
 				store.onKeyed('users:updated', 'user-1', callback1);
 				store.onKeyed('users:updated', 'user-1', callback2);
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'Johnny';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'Johnny';
 				});
 
 				expect(callback1).toHaveBeenCalledTimes(1);
@@ -703,8 +712,8 @@ describe('ObservableStore', () => {
 
 				store.offKeyed('users:updated', 'user-1', callback1);
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'John';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'John';
 				});
 
 				expect(callback1).toHaveBeenCalledTimes(1); // Unsubscribed
@@ -726,8 +735,8 @@ describe('ObservableStore', () => {
 				const callback = vi.fn();
 				store.onKeyed('todos:updated', 0, callback);
 
-				store.update('todos', (draft) => {
-					draft[0].done = true;
+				store.update((draft) => {
+					draft.todos[0].done = true;
 				});
 
 				expect(callback).toHaveBeenCalledTimes(1);
@@ -735,7 +744,7 @@ describe('ObservableStore', () => {
 				expect(patches).toEqual([
 					{
 						op: 'replace',
-						path: [0, 'done'],
+						path: ['todos', 0, 'done'],
 						value: true,
 					},
 				]);
@@ -756,8 +765,8 @@ describe('ObservableStore', () => {
 				const regularCallback = vi.fn();
 				store.on('users:updated', regularCallback);
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'Johnny';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'Johnny';
 				});
 
 				expect(regularCallback).toHaveBeenCalledTimes(1);
@@ -779,8 +788,8 @@ describe('ObservableStore', () => {
 				store.on('users:updated', regularCallback);
 
 				// First update without keyed listeners
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'Johnny';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'Johnny';
 				});
 
 				expect(regularCallback).toHaveBeenCalledTimes(1);
@@ -790,8 +799,8 @@ describe('ObservableStore', () => {
 				store.onKeyed('users:updated', 'user-1', keyedCallback);
 
 				// Second update with keyed listeners
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'John';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'John';
 				});
 
 				expect(regularCallback).toHaveBeenCalledTimes(2);
@@ -812,7 +821,7 @@ describe('ObservableStore', () => {
 				const callback = vi.fn();
 				store.onKeyed('users:updated', 'user-1', callback);
 
-				store.update('users', (draft) => {
+				store.update((draft) => {
 					// No changes
 				});
 
@@ -833,18 +842,60 @@ describe('ObservableStore', () => {
 				store.onKeyed('data:updated', 'any-key', callback);
 
 				// If patches have no path, no keyed events should be emitted
-				store.update('data', (draft) => {
-					// Mutative should generate patches with path
-					Object.assign(draft, {a: 1});
+				store.update((draft) => {
+					// should generate patches with path
+					Object.assign(draft, {a: 9});
 				});
 
 				// This should still emit regular events
 				const regularCallback = vi.fn();
 				store.on('data:updated', regularCallback);
-				store.update('data', (draft) => {
-					draft.a = 1;
+				store.update((draft) => {
+					draft.data.a = 2;
 				});
 				expect(regularCallback).toHaveBeenCalled();
+			});
+
+			it('should handle Object.assign on nested objects', () => {
+				type State = {
+					user: {name: string; age: number};
+				};
+
+				const store = createObservableStore<State>({
+					user: {name: 'John', age: 30},
+				});
+
+				const callback = vi.fn();
+				store.on('user:updated', callback);
+
+				store.update((draft) => {
+					Object.assign(draft.user, {name: 'Jane', age: 31});
+				});
+				// The state should be updated correctly
+				expect(store.get('user')).toEqual({name: 'Jane', age: 31});
+				expect(callback).toHaveBeenCalled();
+			});
+
+			it('should handle Object.assign on top level', () => {
+				type State = {
+					user: {name: string; age: number};
+				};
+
+				const store = createObservableStore<State>({
+					user: {name: 'John', age: 30},
+				});
+
+				const callback = vi.fn();
+				store.on('user:updated', callback);
+
+				console.log(
+					store.update((draft) => {
+						Object.assign(draft, {user: {name: 'Bob', age: 25}});
+					}),
+				);
+
+				expect(store.get('user')).toEqual({name: 'Bob', age: 25});
+				expect(callback).toHaveBeenCalled();
 			});
 
 			it('should emit one keyed event per unique key', () => {
@@ -865,10 +916,10 @@ describe('ObservableStore', () => {
 				store.onKeyed('users:updated', 'user-1', callback1);
 				store.onKeyed('users:updated', 'user-2', callback2);
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'Johnny';
-					draft['user-1'].email = 'johnny@example.com';
-					draft['user-2'].name = 'Janet';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'Johnny';
+					draft.users['user-1'].email = 'johnny@example.com';
+					draft.users['user-2'].name = 'Janet';
 				});
 
 				// Each keyed listener should fire once
@@ -897,8 +948,8 @@ describe('ObservableStore', () => {
 				const keyedCallback = vi.fn();
 				store.onKeyed('users:updated', 'user-1', keyedCallback);
 
-				store.update('users', (draft) => {
-					draft['user-1'].name = 'Johnny';
+				store.update((draft) => {
+					draft.users['user-1'].name = 'Johnny';
 				});
 
 				// Both should receive events
@@ -922,8 +973,8 @@ describe('ObservableStore', () => {
 				// Note: mutative converts numeric keys to strings in patch paths
 				store.onKeyed('items:updated', '1', callback);
 
-				store.update('items', (draft) => {
-					draft[1].value = 'ONE';
+				store.update((draft) => {
+					draft.items[1].value = 'ONE';
 				});
 
 				expect(callback).toHaveBeenCalledTimes(1);
@@ -949,7 +1000,7 @@ describe('ObservableStore', () => {
 			// 	const callback = vi.fn();
 			// 	store.onKeyed('items:updated', key1, callback);
 
-			// 	store.update('items', (draft) => {
+			// 	store.update((draft) => {
 			// 		draft[key1].value = 'ONE';
 			// 	});
 
@@ -992,8 +1043,8 @@ describe('ObservableStore', () => {
 			callback.mockClear();
 
 			// Update the field
-			store.update('counter', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.counter.value += 1;
 			});
 
 			// Callback should be called with new value
@@ -1032,8 +1083,8 @@ describe('ObservableStore', () => {
 			callback.mockClear();
 
 			// First update
-			store.update('counter', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.counter.value += 1;
 			});
 			expect(callback).toHaveBeenCalledTimes(1);
 
@@ -1041,8 +1092,8 @@ describe('ObservableStore', () => {
 			unsubscribe();
 
 			// Second update should not trigger callback
-			store.update('counter', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.counter.value += 1;
 			});
 			expect(callback).toHaveBeenCalledTimes(1);
 		});
@@ -1066,8 +1117,8 @@ describe('ObservableStore', () => {
 			callback1.mockClear();
 			callback2.mockClear();
 
-			store.update('counter', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.counter.value += 1;
 			});
 
 			expect(callback1).toHaveBeenCalledTimes(1);
@@ -1096,16 +1147,16 @@ describe('ObservableStore', () => {
 			userCallback.mockClear();
 
 			// Update counter
-			store.update('counter', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.counter.value += 1;
 			});
 
 			expect(counterCallback).toHaveBeenCalledTimes(1);
 			expect(userCallback).toHaveBeenCalledTimes(0);
 
 			// Update user
-			store.update('user', (draft) => {
-				draft.name = 'Jane';
+			store.update((draft) => {
+				draft.user.name = 'Jane';
 			});
 
 			expect(counterCallback).toHaveBeenCalledTimes(1);
@@ -1127,18 +1178,18 @@ describe('ObservableStore', () => {
 			// Reset after initial call
 			callback.mockClear();
 
-			store.update('counter', (draft) => {
-				draft.value = 10;
+			store.update((draft) => {
+				draft.counter.value = 10;
 			});
 			expect(callback).toHaveBeenNthCalledWith(1, {value: 10});
 
-			store.update('counter', (draft) => {
-				draft.value = 20;
+			store.update((draft) => {
+				draft.counter.value = 20;
 			});
 			expect(callback).toHaveBeenNthCalledWith(2, {value: 20});
 
-			store.update('counter', (draft) => {
-				draft.value = 30;
+			store.update((draft) => {
+				draft.counter.value = 30;
 			});
 			expect(callback).toHaveBeenNthCalledWith(3, {value: 30});
 		});
@@ -1166,9 +1217,9 @@ describe('ObservableStore', () => {
 			// Reset after initial call
 			callback.mockClear();
 
-			store.update('user', (draft) => {
-				draft.name = 'Jane';
-				draft.age = 31;
+			store.update((draft) => {
+				draft.user.name = 'Jane';
+				draft.user.age = 31;
 			});
 
 			expect(callback).toHaveBeenCalledTimes(1);
@@ -1194,8 +1245,8 @@ describe('ObservableStore', () => {
 			// Reset after initial call
 			callback.mockClear();
 
-			store.update('todos', (draft) => {
-				draft.push({id: 1, text: 'Task 1', done: false});
+			store.update((draft) => {
+				draft.todos.push({id: 1, text: 'Task 1', done: false});
 			});
 
 			expect(callback).toHaveBeenCalledTimes(1);
@@ -1217,8 +1268,8 @@ describe('ObservableStore', () => {
 			// Reset after initial call
 			callback.mockClear();
 
-			store.update('counter', (draft) => {
-				draft.value += 1;
+			store.update((draft) => {
+				draft.counter.value += 1;
 			});
 
 			// The callback receives the value, which should be readonly in practice
@@ -1253,14 +1304,14 @@ describe('ObservableStore', () => {
 			callback.mockClear();
 
 			// First update - callback fires and unsubscribes
-			store.update('counter', (draft) => {
-				draft.value = 1;
+			store.update((draft) => {
+				draft.counter.value = 1;
 			});
 			expect(callback).toHaveBeenCalledTimes(1);
 
 			// Second update - callback should not fire (unsubscribed)
-			store.update('counter', (draft) => {
-				draft.value = 2;
+			store.update((draft) => {
+				draft.counter.value = 2;
 			});
 			expect(callback).toHaveBeenCalledTimes(1);
 		});
@@ -1285,8 +1336,8 @@ describe('ObservableStore', () => {
 
 			// Rapid updates
 			for (let i = 1; i <= 10; i++) {
-				store.update('counter', (draft) => {
-					draft.value = i;
+				store.update((draft) => {
+					draft.counter.value = i;
 				});
 			}
 
@@ -1314,8 +1365,8 @@ describe('ObservableStore', () => {
 			// Reset after initial call
 			callback.mockClear();
 
-			store.update('users', (draft) => {
-				draft['user-2'] = {name: 'Jane', email: 'jane@example.com'};
+			store.update((draft) => {
+				draft.users['user-2'] = {name: 'Jane', email: 'jane@example.com'};
 			});
 
 			expect(callback).toHaveBeenCalledTimes(1);
@@ -1409,8 +1460,8 @@ describe('ObservableStore', () => {
 			callback.mockClear();
 
 			// Update the key we're subscribed to
-			store.update('users', (draft) => {
-				draft['user-1'].name = 'Johnny';
+			store.update((draft) => {
+				draft.users['user-1'].name = 'Johnny';
 			});
 
 			// Callback should be called with new value
@@ -1439,8 +1490,8 @@ describe('ObservableStore', () => {
 			callback.mockClear();
 
 			// Update a different key
-			store.update('users', (draft) => {
-				draft['user-2'].name = 'Janet';
+			store.update((draft) => {
+				draft.users['user-2'].name = 'Janet';
 			});
 
 			// Callback should not be called
@@ -1478,8 +1529,8 @@ describe('ObservableStore', () => {
 			callback.mockClear();
 
 			// First update
-			store.update('users', (draft) => {
-				draft['user-1'].name = 'Johnny';
+			store.update((draft) => {
+				draft.users['user-1'].name = 'Johnny';
 			});
 			expect(callback).toHaveBeenCalledTimes(1);
 
@@ -1487,8 +1538,8 @@ describe('ObservableStore', () => {
 			unsubscribe();
 
 			// Second update should not trigger callback
-			store.update('users', (draft) => {
-				draft['user-1'].name = 'John';
+			store.update((draft) => {
+				draft.users['user-1'].name = 'John';
 			});
 			expect(callback).toHaveBeenCalledTimes(1);
 		});
@@ -1512,8 +1563,8 @@ describe('ObservableStore', () => {
 			callback1.mockClear();
 			callback2.mockClear();
 
-			store.update('users', (draft) => {
-				draft['user-1'].name = 'Johnny';
+			store.update((draft) => {
+				draft.users['user-1'].name = 'Johnny';
 			});
 
 			expect(callback1).toHaveBeenCalledTimes(1);
@@ -1539,8 +1590,8 @@ describe('ObservableStore', () => {
 			callback.mockClear();
 
 			// Update first todo
-			store.update('todos', (draft) => {
-				draft[0].done = true;
+			store.update((draft) => {
+				draft.todos[0].done = true;
 			});
 
 			expect(callback).toHaveBeenCalledTimes(1);
@@ -1573,16 +1624,16 @@ describe('ObservableStore', () => {
 			callback2.mockClear();
 
 			// Update user-1
-			store.update('users', (draft) => {
-				draft['user-1'].name = 'Johnny';
+			store.update((draft) => {
+				draft.users['user-1'].name = 'Johnny';
 			});
 
 			expect(callback1).toHaveBeenCalledTimes(1);
 			expect(callback2).toHaveBeenCalledTimes(0);
 
 			// Update user-2
-			store.update('users', (draft) => {
-				draft['user-2'].name = 'Janet';
+			store.update((draft) => {
+				draft.users['user-2'].name = 'Janet';
 			});
 
 			expect(callback1).toHaveBeenCalledTimes(1);
@@ -1604,8 +1655,8 @@ describe('ObservableStore', () => {
 			// Reset after initial call
 			callback.mockClear();
 
-			store.update('users', (draft) => {
-				draft['user-1'].name = 'Johnny';
+			store.update((draft) => {
+				draft.users['user-1'].name = 'Johnny';
 			});
 
 			// The callback receives the value, which should be readonly in practice

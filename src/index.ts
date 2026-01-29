@@ -28,19 +28,21 @@ export type ObservableStoreOptions = {
 /**
  * Type-safe observable store that emits events for each top-level field change.
  *
- * **Note:** Top-level fields must be objects or arrays, not primitives.
- * For primitive values, wrap them in an object: `{ value: number }` instead of `number`.
+ * The state can contain any values including primitives, objects, and arrays.
+ * Updates apply to the full state, and events are emitted for each field that changed.
  *
  * @example
  * ```ts
  * type State = {
  *   user: { name: string; age: number };
- *   counter: { value: number };
+ *   count: number;
+ *   items: string[];
  * };
  *
  * const store = createObservableStore<State>({
  *   user: { name: 'John', age: 30 },
- *   counter: { value: 0 }
+ *   count: 0,
+ *   items: ['a', 'b']
  * });
  *
  * // Subscribe to user field changes
@@ -48,19 +50,21 @@ export type ObservableStoreOptions = {
  *   console.log('User changed:', patches);
  * });
  *
- * // Update user field
- * store.update('user', (draft) => {
- *   draft.name = 'Jane';
- *   // Emits 'user:updated' event with patches
+ * // Subscribe to count field changes
+ * store.on('count:updated', (patches) => {
+ *   console.log('Count changed:', patches);
  * });
  *
- * // Update counter field
- * store.update('counter', (draft) => {
- *   draft.value += 1;
+ * // Update multiple fields at once
+ * store.update((draft) => {
+ *   draft.user.name = 'Jane';
+ *   draft.count += 1;
+ *   draft.items.push('c');
+ *   // Emits 'user:updated', 'count:updated', and 'items:updated' events
  * });
  * ```
  */
-export class ObservableStore<T extends Record<string, NonPrimitive>> {
+export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	private emitter: Emitter<any, KeyedObservableEventMap<T>>;
 
 	public subscriptions: SubscriptionsMap<T>;
@@ -79,35 +83,45 @@ export class ObservableStore<T extends Record<string, NonPrimitive>> {
 	}
 
 	/**
-	 * Update a specific field and emit an event with the patches
+	 * Update the full state and emit events for each field that changed
 	 *
-	 * @param key - The field key to update
-	 * @param mutate - Mutation function that receives a draft of the field value
+	 * @param mutate - Mutation function that receives a draft of the full state
 	 *
 	 * @example
 	 * ```ts
-	 * store.update('user', (draft) => {
-	 *   draft.name = 'Jane';
+	 * // Update multiple fields at once
+	 * store.update((draft) => {
+	 *   draft.user.name = 'Jane';
+	 *   draft.count += 1;
+	 *   draft.items.push('c');
 	 * });
 	 * ```
 	 */
-	public update<K extends keyof T>(key: K, mutate: (draft: Draft<T[K]>) => void): void {
-		const [newState, patches] = this.create(this.state[key], mutate);
-		this.state[key] = newState;
+	public update(mutate: (draft: Draft<T>) => void): Patches {
+		const [newState, patches] = this.create(this.state, mutate);
+		this.state = newState;
 
-		const eventName = `${String(key)}:updated` as EventNames<T>;
+		// Group patches by top-level field key
+		const {all, topLevel} = this.groupPatchesByField(patches);
 
-		// Always emit field level event
-		this.emitter.emit(eventName, patches);
+		// Emit events for each field that changed
+		for (const [fieldKey, fieldPatches] of all.entries()) {
+			const eventName = `${fieldKey}:updated` as EventNames<T>;
 
-		// Conditionally emit keyed events only when there are listeners (performance optimization)
-		if (this.emitter.hasKeyedListeners(eventName)) {
-			const changedKeys = this.extractKeysFromPatches(patches);
-			for (const changedKey of changedKeys) {
-				// Type assertions needed due to TypeScript limitations with generic string literals
-				this.emitter.emitKeyed(eventName, changedKey as any, patches as any);
+			// Always emit field level event
+			this.emitter.emit(eventName, fieldPatches);
+
+			// Conditionally emit keyed events only when there are listeners (performance optimization)
+			if (this.emitter.hasKeyedListeners(eventName)) {
+				const changedKeys = this.extractSecondKeysFromPatches(fieldPatches);
+				for (const changedKey of changedKeys) {
+					// Type assertions needed due to TypeScript limitations with generic string literals
+					this.emitter.emitKeyed(eventName, changedKey as any, fieldPatches as any);
+				}
 			}
 		}
+
+		return patches;
 	}
 
 	/**
@@ -417,14 +431,57 @@ export class ObservableStore<T extends Record<string, NonPrimitive>> {
 	 * @param patches - Array of JSON patches
 	 * @returns Set of unique keys found in patch paths
 	 */
-	private extractKeysFromPatches(patches: Patches): Set<Key> {
+	private extractSecondKeysFromPatches(patches: Patches): Set<Key> {
 		const keys = new Set<Key>();
 		for (const patch of patches) {
-			if (patch.path.length > 0) {
-				keys.add(patch.path[0]);
+			if (patch.path.length > 1) {
+				keys.add(patch.path[1]);
 			}
 		}
 		return keys;
+	}
+
+	/**
+	 * Group patches by their top-level field key
+	 * @param patches - Array of JSON patches for the full state
+	 * @returns Object mapping field keys to their respective patches
+	 */
+	private groupPatchesByField(patches: Patches): {
+		topLevel: Map<string, Patches>;
+		all: Map<string, Patches>;
+	} {
+		const topLevel: Map<string, Patches> = new Map();
+		const all: Map<string, Patches> = new Map();
+
+		for (const patch of patches) {
+			if (patch.path.length === 0) {
+				throw new Error(
+					'This should never happen, we cannot set the root state in the mutate function',
+				);
+			}
+
+			const fieldKey = patch.path[0] as string; // top level is string, type enforce it, we could throw upon initialisation ?
+			if (patch.path.length === 1 || patch.path.length === 2) {
+				// we are dealing with patch affecting the field directly
+				let topLevelGroup = topLevel.get(fieldKey);
+				if (!topLevelGroup) {
+					topLevelGroup = [];
+					topLevel.set(fieldKey, topLevelGroup);
+				}
+
+				// Create a new patch with path relative to the field
+				topLevelGroup.push(patch);
+			}
+			// we are dealing with patch affecting a nested field
+			let allGroup = all.get(fieldKey);
+			if (!allGroup) {
+				allGroup = [];
+				all.set(fieldKey, allGroup);
+			}
+			allGroup.push(patch);
+		}
+
+		return {topLevel, all};
 	}
 }
 
@@ -442,7 +499,7 @@ export class ObservableStore<T extends Record<string, NonPrimitive>> {
  * });
  * ```
  */
-export function createObservableStore<T extends Record<string, NonPrimitive>>(
+export function createObservableStore<T extends Record<string, unknown> & NonPrimitive>(
 	state: T,
 	options?: ObservableStoreOptions,
 ): ObservableStore<T> {
@@ -450,7 +507,7 @@ export function createObservableStore<T extends Record<string, NonPrimitive>>(
 }
 
 export function createObservableStoreFactory(factoryOptions: ObservableStoreOptions) {
-	return function createObservableStore<T extends Record<string, NonPrimitive>>(
+	return function createObservableStore<T extends Record<string, unknown> & NonPrimitive>(
 		state: T,
 		options?: ObservableStoreOptions,
 	): ObservableStore<T> {
