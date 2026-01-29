@@ -1,4 +1,4 @@
-# observe-store
+# observator
 
 A type-safe store that emits events for each top-level field change. Uses [patch-recorder](https://github.com/wighawag/patch-recorder) by default for immutable updates with JSON Patch generation, but you can use any compatible library (e.g., mutative or immer). Uses [radiate](https://github.com/wighawag/radiate) for type-safe event emission.
 
@@ -16,14 +16,14 @@ A type-safe store that emits events for each top-level field change. Uses [patch
 ## Installation
 
 ```bash
-npm install observe-store
+npm install observator
 # or
-pnpm add observe-store
+pnpm add observator
 # or
-yarn add observe-store
+yarn add observator
 ```
 
-By default, `observe-store` uses [patch-recorder](https://github.com/wighawag/patch-recorder) for patch generation. To use a different library, install it as well:
+By default, `observator` uses [patch-recorder](https://github.com/wighawag/patch-recorder) for patch generation. To use a different library, install it as well:
 
 ```bash
 # Using mutative
@@ -32,13 +32,6 @@ npm install mutative
 # Using immer
 npm install immer
 ```
-
-## Important: Non-Primitive Type Constraint
-
-**Note:** Top-level fields must be objects or arrays, not primitives. For primitive values (numbers, strings, booleans), wrap them in an object.
-
-This is because patch generation libraries require objects or arrays to generate patches properly.
-
 ## Usage
 
 ### Quick Start
@@ -46,15 +39,15 @@ This is because patch generation libraries require objects or arrays to generate
 The simplest way to use `observe-store` is to import `createObservableStore` and call it with your initial state. It uses [patch-recorder](https://github.com/wighawag/patch-recorder) by default:
 
 ```typescript
-import {createObservableStore} from 'observe-store';
+import {createObservableStore} from 'observator';
 
 type State = {
-  counter: { value: number };
+  counter: number;
   user: { name: string };
 };
 
 const store = createObservableStore<State>({
-  counter: { value: 0 },
+  counter: 0,
   user: { name: 'John' }
 });
 
@@ -64,61 +57,27 @@ store.on('counter:updated', (patches) => {
 });
 
 // Update counter
-store.update('counter', (draft) => {
-  draft.value += 1;
+store.update((draft) => {
+  draft.counter += 1;
 });
 
 console.log(store.get('counter')); // { value: 1 }
 ```
 
-### Using a Different Patch Generation Library
 
-If you want to use a different patch generation library, use `createObservableStoreFactory` with your custom create function:
-
-```typescript
-import {createObservableStoreFactory, mutativeAdapter} from 'observe-store';
-
-// Using mutative
-import {create} from 'mutative';
-
-const createObservableStore = createObservableStoreFactory(
-  mutativeAdapter(create),
-);
-
-// Now use it as normal
-const store = createObservableStore<State>({
-  counter: { value: 0 }
-});
-```
-
-> **Note:** Using mutative means that any update result in a new state object. mutative use immutable objects. patch-recorder on the other hand, uses mutable objects and keep the same reference.
-
-Or with any library that follows the same interface:
+### Basic Example with Primitives
 
 ```typescript
-import {createObservableStoreFactory} from 'observe-store';
-
-// Using any custom create function
-const createObservableStore = createObservableStoreFactory((state, mutate) => {
-  // Your custom implementation here
-  // Must return [newState, patches]
-  return [newState, patches];
-});
-```
-
-### Basic Example with Primitives (Wrapped)
-
-```typescript
-import {createObservableStore} from 'observe-store';
+import {createObservableStore} from 'observator';
 
 type State = {
-  counter: { value: number };
-  name: { value: string };
+  counter: number;
+  name: string;
 };
 
 const store = createObservableStore<State>({
-  counter: { value: 0 },
-  name: { value: 'John' }
+  counter: 0,
+  name: 'John'
 });
 
 // Subscribe to counter updates
@@ -128,8 +87,8 @@ store.on('counter:updated', (patches) => {
 });
 
 // Update counter
-store.update('counter', (draft) => {
-  draft.value += 1;
+store.update((draft) => {
+  draft.counter += 1;
 });
 
 console.log(store.get('counter')); // { value: 1 }
@@ -138,7 +97,7 @@ console.log(store.get('counter')); // { value: 1 }
 ### Example with Complex Objects
 
 ```typescript
-import {createObservableStore} from 'observe-store';
+import {createObservableStore} from 'observator';
 
 type State = {
   user: {
@@ -171,9 +130,9 @@ store.on('user:updated', (patches) => {
 });
 
 // Update user
-store.update('user', (draft) => {
-  draft.name = 'Jane Doe';
-  draft.age = 31;
+store.update((draft) => {
+  draft.user.name = 'Jane Doe';
+  draft.user.age = 31;
 });
 
 // Subscribe to settings changes
@@ -182,9 +141,9 @@ const unsubscribe = store.on('settings:updated', (patches) => {
 });
 
 // Update settings
-store.update('settings', (draft) => {
-  draft.theme = 'dark';
-  draft.notifications = false;
+store.update((draft) => {
+  draft.settings.theme = 'dark';
+  draft.settings.notifications = false;
 });
 
 // Unsubscribe later
@@ -200,15 +159,15 @@ The `subscribe` API provides a convenient way to subscribe to field values. Unli
 - **Returns an unsubscribe function** for easy cleanup
 
 ```typescript
-import {createObservableStore} from 'observe-store';
+import {createObservableStore} from 'observator';
 
 type State = {
-  counter: { value: number };
+  counter: number;
   user: { name: string };
 };
 
 const store = createObservableStore<State>({
-  counter: { value: 0 },
+  counter: 0,
   user: { name: 'John' }
 });
 
@@ -219,8 +178,8 @@ store.subscribe.counter((counter) => {
 // Output: Counter value: 0
 
 // Update counter - callback fires again with new value
-store.update('counter', (draft) => {
-  draft.value += 1;
+store.update((draft) => {
+  draft.counter += 1;
 });
 // Output: Counter value: 1
 
@@ -233,8 +192,8 @@ const unsubscribe = store.subscribe.user((user) => {
 // Unsubscribe from user updates
 unsubscribe();
 
-store.update('user', (draft) => {
-  draft.name = 'Jane';
+store.update((draft) => {
+  draft.user.name = 'Jane';
 });
 // No callback fired (unsubscribed)
 ```
@@ -266,7 +225,7 @@ store.subscribe.counter((counter) => {
 ### Example with Arrays
 
 ```typescript
-import {createObservableStore} from 'observe-store';
+import {createObservableStore} from 'observator';
 
 type State = {
   items: number[];
@@ -286,14 +245,14 @@ store.on('items:updated', (patches) => {
 });
 
 // Add item
-store.update('items', (draft) => {
-  draft.push(4);
+store.update((draft) => {
+  draft.items.push(4);
 });
 
 // Update todos
-store.update('todos', (draft) => {
-  draft.push({ id: 2, text: 'Build apps', done: false });
-  draft[0].done = true;
+store.update((draft) => {
+  draft.todos.push({ id: 2, text: 'Build apps', done: false });
+  draft.todos[0].done = true;
 });
 ```
 
@@ -302,7 +261,7 @@ store.update('todos', (draft) => {
 For fields containing records or arrays, you can subscribe to changes for specific keys:
 
 ```typescript
-import {createObservableStore} from 'observe-store';
+import {createObservableStore} from 'observator';
 
 type State = {
   users: Record<string, { name: string; email: string }>;
@@ -321,14 +280,14 @@ const unsubscribe1 = store.onKeyed('users:updated', 'user-1', (patches) => {
 });
 
 // Update user-1
-store.update('users', (draft) => {
-  draft['user-1'].name = 'Johnny';
+store.update((draft) => {
+  draft.users['user-1'].name = 'Johnny';
 });
 // Only the user-1 callback fires
 
 // Update user-2
-store.update('users', (draft) => {
-  draft['user-2'].name = 'Janet';
+store.update((draft) => {
+  draft.users['user-2'].name = 'Janet';
 });
 // The user-1 callback does NOT fire
 
@@ -345,9 +304,9 @@ const unsubscribe = store.onKeyed('users:updated', '*', (userId, patches) => {
   console.log(`User ${userId} changed:`, patches);
 });
 
-store.update('users', (draft) => {
-  draft['user-1'].name = 'Johnny';
-  draft['user-2'].name = 'Janet';
+store.update((draft) => {
+  draft.users['user-1'].name = 'Johnny';
+  draft.user['user-2'].name = 'Janet';
 });
 
 unsubscribe();
@@ -374,8 +333,8 @@ store.onKeyed('todos:updated', 0, (patches) => {
   console.log('First todo changed:', patches);
 });
 
-store.update('todos', (draft) => {
-  draft[0].done = true;
+store.update((draft) => {
+  draft.todos[0].done = true;
 });
 // Only the first todo callback fires
 ```
@@ -390,13 +349,13 @@ store.onceKeyed('users:updated', 'user-1', (patches) => {
   console.log('User 1 changed once:', patches);
 });
 
-store.update('users', (draft) => {
-  draft['user-1'].name = 'Johnny';
+store.update((draft) => {
+  draft.users['user-1'].name = 'Johnny';
 });
 // Callback fires once
 
-store.update('users', (draft) => {
-  draft['user-1'].name = 'John';
+store.update((draft) => {
+  draft.users['user-1'].name = 'John';
 });
 // Callback does NOT fire again
 ```
@@ -412,15 +371,15 @@ const callback2 = (patches) => console.log('Callback 2:', patches);
 store.onKeyed('users:updated', 'user-1', callback1);
 store.onKeyed('users:updated', 'user-1', callback2);
 
-store.update('users', (draft) => {
-  draft['user-1'].name = 'Johnny';
+store.update((draft) => {
+  draft.users['user-1'].name = 'Johnny';
 });
 // Both callbacks fire
 
 store.offKeyed('users:updated', 'user-1', callback1);
 
-store.update('users', (draft) => {
-  draft['user-1'].name = 'John';
+store.update((draft) => {
+  draft.users['user-1'].name = 'John';
 });
 // Only callback2 fires
 ```
@@ -428,14 +387,14 @@ store.update('users', (draft) => {
 ### Multiple Subscribers
 
 ```typescript
-import {createObservableStore} from 'observe-store';
+import {createObservableStore} from 'observator';
 
 type State = {
-  count: { value: number };
+  count: number;
 };
 
 const store = createObservableStore<State>({
-  count: { value: 0 }
+  count: 0
 });
 
 // Multiple subscribers to the same event
@@ -447,8 +406,8 @@ const unsubscribe2 = store.on('count:updated', (patches) => {
   console.log('Subscriber 2:', patches);
 });
 
-store.update('count', (draft) => {
-  draft.value += 1;
+store.update((draft) => {
+  draft.count += 1;
 });
 
 // Both subscribers receive the event
@@ -460,16 +419,16 @@ store.update('count', (draft) => {
 ### Get Entire State
 
 ```typescript
-import {createObservableStore} from 'observe-store';
+import {createObservableStore} from 'observator';
 
 type State = {
   user: { name: string };
-  counter: { value: number };
+  counter: number;
 };
 
 const store = createObservableStore<State>({
   user: { name: 'John' },
-  counter: { value: 0 }
+  counter: 0
 });
 
 const entireState = store.getState();
@@ -500,17 +459,17 @@ Creates a new ObservableStore instance with the given initial state. Uses `patch
 
 **Example (default usage):**
 ```typescript
-import {createObservableStore} from 'observe-store';
+import {createObservableStore} from 'observator';
 
 const store = createObservableStore({
   user: { name: 'John' },
-  counter: { value: 0 }
+  counter: 0
 });
 ```
 
 **Example (with custom create function):**
 ```typescript
-import {createObservableStore} from 'observe-store';
+import {createObservableStore} from 'observator';
 import {create} from 'mutative';
 
 const store = createObservableStore(
@@ -518,52 +477,24 @@ const store = createObservableStore(
     user: { name: 'John' },
     counter: { value: 0 }
   },
-  (state, mutate) => create(state, mutate, {enablePatches: true}),
+  {createFunction: (state, mutate) => create(state, mutate, {enablePatches: true})},
 );
 ```
 
-### `createObservableStoreFactory(create: CreateFunction): <T>(state: T) => ObservableStore<T>`
-
-Creates a factory function for creating ObservableStore instances with a specific patch generation mechanism. Use this when you want to create multiple stores with the same custom create function.
-
-**Parameters:**
-- `create` - A function that takes `(state: S, mutate: (draft: Draft<S>) => void)` and returns `[newState: S, patches: Patches<true>]`
-
-**Returns:**
-- A `createObservableStore` function that creates `ObservableStore<T>` instances
-
-**Example:**
-```typescript
-import {createObservableStoreFactory, mutativeAdapter} from 'observe-store';
-import {create} from 'mutative';
-
-const createObservableStore = createObservableStoreFactory(
-  mutativeAdapter(create),
-);
-
-const store = createObservableStore({
-  user: { name: 'John' },
-  counter: { value: 0 }
-});
-```
 
 ### `ObservableStore<T>`
 
-#### `update<K extends keyof T>(key: K, mutate: (draft: Draft<T[K]>) => void): void`
+#### `update(mutate: (draft: T) => void): void`
 
-Updates a specific field and emits an event with the patches.
-
-**Type Parameters:**
-- `K` - The field key to update
+Updates the state and emits an event with the patches.
 
 **Parameters:**
-- `key` - The field key to update
 - `mutate` - Mutation function that receives a draft of the field value
 
 **Example:**
 ```typescript
-store.update('user', (draft) => {
-  draft.name = 'Jane';
+store.update((draft) => {
+  draft.user.name = 'Jane';
 });
 ```
 
@@ -904,7 +835,7 @@ type BetterState = {
   flag: PrimitiveField<boolean>;
 };
 
-import {createObservableStore} from 'observe-store';
+import {createObservableStore} from 'observator';
 
 const store = createObservableStore<BetterState>({
   count: { value: 0 },
