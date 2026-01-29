@@ -61,7 +61,7 @@ store.update((state) => {
   state.counter += 1;
 });
 
-console.log(store.get('counter')); // { value: 1 }
+console.log(store.get('counter')); // 1
 ```
 
 
@@ -83,7 +83,7 @@ const store = createObservableStore<State>({
 // Subscribe to counter updates
 store.on('counter:updated', (patches) => {
   console.log('Counter changed:', patches);
-  // Output: [{ op: 'replace', path: ['value'], value: 1 }]
+  // Output: [{ op: 'replace', path: ['counter'], value: 1 }]
 });
 
 // Update counter
@@ -91,7 +91,7 @@ store.update((state) => {
   state.counter += 1;
 });
 
-console.log(store.get('counter')); // { value: 1 }
+console.log(store.get('counter')); // 1
 ```
 
 ### Example with Complex Objects
@@ -126,7 +126,7 @@ const store = createObservableStore<State>({
 // Subscribe to user changes
 store.on('user:updated', (patches) => {
   console.log('User updated:', patches);
-  // Output: [{ op: 'replace', path: ['name'], value: 'Jane Doe' }]
+  // Output: [{ op: 'replace', path: ['user', 'name'], value: 'Jane Doe' }]
 });
 
 // Update user
@@ -172,8 +172,8 @@ const store = createObservableStore<State>({
 });
 
 // Subscribe to counter - callback fires immediately with current value
-store.subscribe.counter((counter) => {
-  console.log('Counter value:', counter.value);
+store.subscriptions.counter((counter) => {
+  console.log('Counter value:', counter);
 });
 // Output: Counter value: 0
 
@@ -184,7 +184,7 @@ store.update((state) => {
 // Output: Counter value: 1
 
 // Subscribe to user
-const unsubscribe = store.subscribe.user((user) => {
+const unsubscribe = store.subscriptions.user((user) => {
   console.log('User name:', user.name);
 });
 // Output: User name: John
@@ -211,13 +211,13 @@ store.update((state) => {
 // Patch-based subscription
 store.on('counter:updated', (patches) => {
   const current = store.get('counter');
-  console.log('Counter:', current.value);
+  console.log('Counter:', current);
   // Need to manually get current value
 });
 
 // Value-based subscription
-store.subscribe.counter((counter) => {
-  console.log('Counter:', counter.value);
+store.subscriptions.counter((counter) => {
+  console.log('Counter:', counter);
   // Automatically receives latest value
 });
 ```
@@ -433,26 +433,27 @@ const store = createObservableStore<State>({
 
 const entireState = store.getState();
 console.log(entireState);
-// { user: { name: 'John' }, counter: { value: 0 } }
+// { user: { name: 'John' }, counter: 0 }
 
 // Returns a shallow copy, so modifications don't affect the store
 const stateCopy = store.getState();
-stateCopy.counter.value = 999;
-console.log(store.get('counter')); // Still { value: 0 }
+stateCopy.counter = 999;
+console.log(store.get('counter')); // Still 0
 ```
 
 ## API
 
-### `createObservableStore<T>(state: T, create?: CreateFunction): ObservableStore<T>`
+### `createObservableStore<T>(state: T, options?: ObservableStoreOptions): ObservableStore<T>`
 
 Creates a new ObservableStore instance with the given initial state. Uses `patch-recorder` by default, but you can pass a custom create function.
 
 **Type Parameter:**
-- `T` - The state type, must be `Record<string, object | Array<any>>`
+- `T` - The state type, must be `Record<string, unknown> & NonPrimitive`
 
 **Parameters:**
 - `state` - Initial state object
-- `create` - Optional custom create function for patch generation
+- `options` - Optional configuration object
+  - `createFunction?: CreateFunction` - Custom create function for patch generation
 
 **Returns:**
 - A new `ObservableStore<T>` instance
@@ -484,12 +485,15 @@ const store = createObservableStore(
 
 ### `ObservableStore<T>`
 
-#### `update(mutate: (state: T) => void): void`
+#### `update(mutate: (state: T) => void): Patches`
 
-Updates the state and emits an event with the patches.
+Updates the full state and emits events for each field that changed.
 
 **Parameters:**
-- `mutate` - Mutation function that receives a state of the field value
+- `mutate` - Mutation function that receives the full state
+
+**Returns:**
+- Array of patches for the full state
 
 **Example:**
 ```typescript
@@ -517,7 +521,7 @@ const user = store.get('user');
 console.log(user.name); // 'John'
 ```
 
-#### `on<K extends keyof T>(event: `${K & string}:updated`, callback: (patches: Patches<true>) => void): () => void`
+#### `on<K extends keyof T>(event: EventName<K>, callback: (patches: Patches) => void): () => void`
 
 Subscribes to updates for a specific field.
 
@@ -541,7 +545,50 @@ const unsubscribe = store.on('user:updated', (patches) => {
 unsubscribe();
 ```
 
-#### `onKeyed<K extends keyof T>(event: `${K & string}:updated`, key: PropertyKey, callback: (patches: Patches<true>) => void): () => void`
+#### `off<K extends keyof T>(event: EventName<K>, callback: (patches: Patches) => void): void`
+
+Removes a specific event listener.
+
+**Type Parameters:**
+- `K` - The field key
+
+**Parameters:**
+- `event` - The event name in format `${fieldName}:updated`
+- `callback` - The exact callback function to remove
+
+**Example:**
+```typescript
+const callback = (patches) => console.log('User changed:', patches);
+store.on('user:updated', callback);
+
+// Later:
+store.off('user:updated', callback);
+```
+
+#### `once<K extends keyof T>(event: EventName<K>, callback: (patches: Patches) => void): () => void`
+
+Subscribes to a single emission of an event.
+
+**Type Parameters:**
+- `K` - The field key to subscribe to
+
+**Parameters:**
+- `event` - The event name in format `${fieldName}:updated`
+- `callback` - Callback function that receives the patches array
+
+**Returns:**
+- Unsubscribe function to remove listener before it fires
+
+**Example:**
+```typescript
+const unsubscribe = store.once('user:updated', (patches) => {
+  console.log('User changed once:', patches);
+});
+
+// Callback will fire once, then automatically unsubscribe
+```
+
+#### `onKeyed<K extends keyof T>(event: EventName<K>, key: Key, callback: (patches: Patches) => void): () => void`
 
 Subscribes to updates for a specific key within a field.
 
@@ -565,9 +612,12 @@ const unsubscribe = store.onKeyed('users:updated', 'user-123', (patches) => {
 unsubscribe();
 ```
 
-#### `onKeyed<K extends keyof T>(event: `${K & string}:updated`, key: '*', callback: (key: PropertyKey, patches: Patches<true>) => void): () => void`
+#### `onKeyed<K extends keyof T>(event: EventName<K>, key: '*', callback: (key: ExtractKeyType<T[K]>, patches: Patches) => void): () => void`
 
 Subscribes to all keys within a field (wildcard subscription).
+
+**Type Parameters:**
+- `K` - The field key to subscribe to
 
 **Parameters:**
 - `event` - The event name in format `${fieldName}:updated`
@@ -586,7 +636,7 @@ const unsubscribe = store.onKeyed('users:updated', '*', (userId, patches) => {
 unsubscribe();
 ```
 
-#### `offKeyed<K extends keyof T>(event: `${K & string}:updated`, key: PropertyKey, callback: (patches: Patches<true>) => void): void`
+#### `offKeyed<K extends keyof T>(event: EventName<K>, key: Key, callback: (patches: Patches) => void): void`
 
 Unsubscribes a specific listener from a keyed event.
 
@@ -603,7 +653,7 @@ store.onKeyed('users:updated', 'user-123', callback);
 store.offKeyed('users:updated', 'user-123', callback);
 ```
 
-#### `onceKeyed<K extends keyof T>(event: `${K & string}:updated`, key: PropertyKey, callback: (patches: Patches<true>) => void): () => void`
+#### `onceKeyed<K extends keyof T>(event: EventName<K>, key: Key, callback: (patches: Patches) => void): () => void`
 
 Subscribes to a keyed event for a single emission only.
 
@@ -624,7 +674,7 @@ const unsubscribe = store.onceKeyed('users:updated', 'user-123', (patches) => {
 // Callback will fire once, then automatically unsubscribe
 ```
 
-#### `onceKeyed<K extends keyof T>(event: `${K & string}:updated`, key: '*', callback: (key: PropertyKey, patches: Patches<true>) => void): () => void`
+#### `onceKeyed<K extends keyof T>(event: EventName<K>, key: '*', callback: (key: ExtractKeyType<T[K]>, patches: Patches) => void): () => void`
 
 Subscribes to all keys within a field for a single emission only (wildcard).
 
@@ -658,7 +708,7 @@ const state = store.getState();
 console.log(state);
 ```
 
-#### `subscribe: SubscribeMap<T>`
+#### `subscriptions: SubscriptionsMap<T>`
 
 A convenient object with keys matching all state fields. Each field provides a subscribe function that:
 
@@ -669,8 +719,8 @@ A convenient object with keys matching all state fields. Each field provides a s
 **Example:**
 ```typescript
 // Subscribe to counter field
-const unsubscribe = store.subscribe.counter((counter) => {
-  console.log('Counter value:', counter.value);
+const unsubscribe = store.subscriptions.counter((counter) => {
+  console.log('Counter value:', counter);
 });
 
 // Unsubscribe later
@@ -680,18 +730,54 @@ unsubscribe();
 **Type-safe access:**
 ```typescript
 type State = {
-  counter: { value: number };
+  counter: number;
   user: { name: string };
 };
 
 const store = createObservableStore<State>({ ... });
 
 // ✅ Valid - TypeScript knows these are the available fields
-store.subscribe.counter((counter) => { /* counter: { value: number } */ });
-store.subscribe.user((user) => { /* user: { name: string } */ });
+store.subscriptions.counter((counter) => { /* counter: number */ });
+store.subscriptions.user((user) => { /* user: { name: string } */ });
 
 // ❌ Type error - Invalid field name
-store.subscribe.invalid((value) => { /* Type error */ });
+store.subscriptions.invalid((value) => { /* Type error */ });
+```
+
+#### `keyedSubscriptions: KeyedSubscriptionsMap<T>`
+
+A convenient object with keys matching all state fields. Each field provides a function that takes a key and returns a subscribe function. The subscribe function:
+
+- Executes the callback immediately with the current field value
+- Executes the callback on every field change for that specific key
+- Returns an unsubscribe function
+
+**Example:**
+```typescript
+// Subscribe to specific user updates
+const unsubscribe = store.keyedSubscriptions.users('user-1')((users) => {
+  console.log('User 1:', users['user-1'].name);
+});
+
+// Unsubscribe later
+unsubscribe();
+```
+
+**Type-safe access:**
+```typescript
+type State = {
+  users: Record<string, { name: string }>;
+  todos: Array<{ id: number; text: string }>;
+};
+
+const store = createObservableStore<State>({ ... });
+
+// ✅ Valid - TypeScript knows these are the available fields
+store.keyedSubscriptions.users('user-1')((users) => { /* users: Record<string, { name: string }> */ });
+store.keyedSubscriptions.todos(0)((todos) => { /* todos: Array<{ id: number; text: string }> */ });
+
+// ❌ Type error - Invalid field name
+store.keyedSubscriptions.invalid('key')((value) => { /* Type error */ });
 ```
 
 ## Type Safety
@@ -707,8 +793,8 @@ type State = {
 const store = createObservableStore<State>({ ... });
 
 // ✅ Valid
-store.update('user', (state) => {
-  state.name = 'Jane';
+store.update((state) => {
+  state.user.name = 'Jane';
 });
 
 // ❌ Type error: Invalid field name
@@ -750,25 +836,25 @@ store.onKeyed('invalid:updated', 'user-1', (patches) => {
 
 // ✅ Subscribe API with type safety
 type State = {
-  counter: { value: number };
+  counter: number;
   user: { name: string };
 };
 
 const store = createObservableStore<State>({ ... });
 
 // ✅ Valid - TypeScript infers correct types
-store.subscribe.counter((counter) => {
-  // counter is typed as { value: number }
-  console.log(counter.value);
+store.subscriptions.counter((counter) => {
+  // counter is typed as number
+  console.log(counter);
 });
 
-store.subscribe.user((user) => {
+store.subscriptions.user((user) => {
   // user is typed as { name: string }
   console.log(user.name);
 });
 
 // ❌ Type error: Invalid field name
-store.subscribe.invalid((value) => {
+store.subscriptions.invalid((value) => {
   // Type error
 });
 ```
@@ -809,19 +895,29 @@ store.update('users', (state) => {
 
 ## Working with Primitives
 
-Since top-level fields must be objects or arrays, wrap primitives in an object:
+The top-level state must be a non-primitive object or array (enforced by TypeScript), but field values can be primitives when using patch-recorder (the default). For maximum compatibility across all patch generation libraries (including mutative/immer), wrap primitives in objects:
 
 ```typescript
-// ❌ Not allowed - primitives at top level
-type BadState = {
-  count: number;
+// ✅ Works with patch-recorder (default)
+type State1 = {
+  count: number;  // Primitive at field level works
   name: string;
   flag: boolean;
 };
 
-// ✅ Correct - wrapped primitives
-type GoodState = {
-  count: { value: number };
+const store1 = createObservableStore<State1>({
+  count: 0,
+  name: 'John',
+  flag: false
+});
+
+store1.update((state) => {
+  state.count += 1;
+});
+
+// For maximum compatibility across all libraries (mutative, immer)
+type State2 = {
+  count: { value: number };  // Wrapped primitive
   name: { value: string };
   flag: { value: boolean };
 };
@@ -835,16 +931,14 @@ type BetterState = {
   flag: PrimitiveField<boolean>;
 };
 
-import {createObservableStore} from 'observator';
-
-const store = createObservableStore<BetterState>({
+const store2 = createObservableStore<BetterState>({
   count: { value: 0 },
   name: { value: 'John' },
   flag: { value: false }
 });
 
-store.update('count', (state) => {
-  state.value += 1;
+store2.update((state) => {
+  state.count.value += 1;
 });
 ```
 

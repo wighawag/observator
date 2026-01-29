@@ -10,6 +10,8 @@ This document provides guidance for AI agents working on the `observator` projec
 
 The store allows any custom patch generation library (mutative, immer, etc.) and emits events for each top-level field change with JSON Patch arrays, enabling fine-grained reactivity.
 
+**Important:** The state can contain any values including primitives, objects, and arrays. The library works with primitives at the top level when using patch-recorder (the default).
+
 ## Key Design Decisions
 
 ### 1. Patch Generation Library Agnostic
@@ -24,7 +26,7 @@ Users can optionally use other libraries like:
 - **immer**: Well-known immutable state management with JSON patch support
 
 **Important:** Different patch generation libraries may have different requirements:
-- `patch-recorder` (default): Works with any values, uses mutable references
+- `patch-recorder` (default): Works with any values including primitives, uses mutable references
 - `mutative/immer`: May require objects/arrays at field level to generate patches properly
 
 ### 2. State Update Model
@@ -55,22 +57,22 @@ store.update((state) => {
 
 ### 3. Non-Primitive Considerations
 
-While the library is designed to be flexible, some patch generation libraries may have restrictions:
-- **patch-recorder (default)**: Works with any values including primitives
-- **mutative/immer**: May require objects or arrays to generate patches properly
+The library enforces that the state must be a non-primitive object or array at the top level. However, patch-recorder (the default) supports primitives at the field level.
 
-For maximum compatibility across all patch generation libraries, wrap primitives in objects:
+For maximum compatibility across all patch generation libraries (including mutative/immer), wrap primitives in objects:
 ```typescript
-// ❌ Don't do this
-type BadState = {
-  count: number;
+// Works with patch-recorder (default)
+type State1 = {
+  count: number;  // ✅ Primitive at field level works with patch-recorder
 };
 
-// ✅ Do this instead
-type GoodState = {
-  count: { value: number };
+// For maximum compatibility across all libraries
+type State2 = {
+  count: { value: number };  // ✅ Wrapped primitive works with all libraries
 };
 ```
+
+**Note:** The state type itself must extend `Record<string, unknown> & NonPrimitive`, which means the top-level state cannot be a primitive value.
 
 ### 4. Event Naming Convention
 
@@ -86,10 +88,11 @@ type EventName<K extends string> = `${K}:updated`;
 Patches are generated for the full state and grouped by top-level field:
 - For state `{ count: { value: 0 } }`, updating `state.count.value = 1` produces: `[{ op: 'replace', path: ['count', 'value'], value: 1 }]`
 - For state `{ user: { name: 'John' } }`, updating `state.user.name = 'Jane'` produces: `[{ op: 'replace', path: ['user', 'name'], value: 'Jane' }]`
+- For state `{ count: 0 }`, updating `state.count = 1` produces: `[{ op: 'replace', path: ['count'], value: 1 }]` (works with patch-recorder)
 
 The patches are grouped by field, so `user:updated` event receives patches with paths starting with `['user', ...]`.
 
-All patches follow [JSON Patch (RFC 6902)](https://datatracker.ietf.org/doc/html/rfc6902) format.
+All patches follow [JSON Patch (RFC 6902)](https://datatracker.ietf.org/doc/html/rfc6902) format with paths as arrays of strings, numbers, symbols, or objects.
 
 ### 6. Type Safety
 
@@ -268,8 +271,6 @@ expect(callback).toHaveBeenCalledWith([
 
 4. **Forgetting keyed events only emit when listeners exist:** Keyed events are conditionally emitted for performance. They only fire when there are active keyed listeners.
 
-5. **Using wrong patch generation library:** Some libraries (mutative, immer) may require objects/arrays at field level to generate patches, while patch-recorder works with any values.
-
 ## File Structure
 
 ```
@@ -302,15 +303,15 @@ Watch build: `pnpm dev`
 ### Simple Counter
 ```typescript
 type State = {
-  counter: { value: number };
+  counter: number;
 };
 
 const store = createObservableStore<State>({
-  counter: { value: 0 }
+  counter: 0
 });
 
 store.update((state) => {
-  state.counter.value += 1;
+  state.counter += 1;
 });
 ```
 
