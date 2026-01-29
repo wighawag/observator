@@ -256,6 +256,130 @@ store.update((state) => {
 });
 ```
 
+### Wildcard Event - Subscribe to All Updates
+
+Subscribe to all updates across the entire store using the wildcard `'*'` event:
+
+```typescript
+import {createObservableStore} from 'observator';
+
+type State = {
+  counter: number;
+  user: { name: string };
+  settings: { theme: string };
+};
+
+const store = createObservableStore<State>({
+  counter: 0,
+  user: { name: 'John' },
+  settings: { theme: 'light' }
+});
+
+// Subscribe to all updates
+const unsubscribe = store.on('*', (patches) => {
+  console.log('State changed with patches:', patches);
+});
+
+// Update counter - wildcard event fires
+store.update((state) => {
+  state.counter += 1;
+});
+// Output: State changed with patches: [{ op: 'replace', path: ['counter'], value: 1 }]
+
+// Update user - wildcard event fires again
+store.update((state) => {
+  state.user.name = 'Jane';
+});
+// Output: State changed with patches: [{ op: 'replace', path: ['user', 'name'], value: 'Jane' }]
+
+// Update multiple fields at once - wildcard event fires once with all patches
+store.update((state) => {
+  state.counter += 1;
+  state.settings.theme = 'dark';
+});
+// Output: State changed with patches: [
+//   { op: 'replace', path: ['counter'], value: 2 },
+//   { op: 'replace', path: ['settings', 'theme'], value: 'dark' }
+// ]
+
+unsubscribe();
+```
+
+#### Use Cases
+
+The wildcard event is useful for:
+
+- **Logging/debugging** - Track all state changes
+- **Persistence** - Save state to localStorage/database on any change
+- **Analytics** - Track user interactions across the app
+- **Undo/redo systems** - Maintain a history of all changes
+
+#### Combining with Field-Specific Events
+
+You can use the wildcard event alongside field-specific events:
+
+```typescript
+// Wildcard listener for logging
+store.on('*', (patches) => {
+  console.log('State changed:', patches);
+});
+
+// Field-specific listener for specific logic
+store.on('user:updated', (patches) => {
+  console.log('User specifically changed:', patches);
+});
+
+store.update((state) => {
+  state.user.name = 'Jane';
+});
+// Both listeners fire
+```
+
+#### Single Emission
+
+Subscribe to all updates for a single emission only:
+
+```typescript
+// Subscribe for single emission
+store.once('*', (patches) => {
+  console.log('State changed once:', patches);
+});
+
+store.update((state) => {
+  state.counter += 1;
+});
+// Callback fires once
+
+store.update((state) => {
+  state.counter += 1;
+});
+// Callback does NOT fire again
+```
+
+#### Unsubscribe Specific Listener
+
+Remove a specific wildcard listener:
+
+```typescript
+const callback1 = (patches) => console.log('Listener 1:', patches);
+const callback2 = (patches) => console.log('Listener 2:', patches);
+
+store.on('*', callback1);
+store.on('*', callback2);
+
+store.update((state) => {
+  state.counter += 1;
+});
+// Both callbacks fire
+
+store.off('*', callback1);
+
+store.update((state) => {
+  state.counter += 1;
+});
+// Only callback2 fires
+```
+
 ### Keyed Events - Subscribe to Specific Keys
 
 For fields containing records or arrays, you can subscribe to changes for specific keys:
@@ -586,6 +710,74 @@ const unsubscribe = store.once('user:updated', (patches) => {
 });
 
 // Callback will fire once, then automatically unsubscribe
+```
+
+#### `on(event: EventNames<T>, callback: (patches: Patches) => void): () => void`
+
+Subscribes to updates for a specific field or all updates.
+
+**Parameters:**
+- `event` - The event name in format `${fieldName}:updated` or `'*'` for all updates
+- `callback` - Callback function that receives the patches array
+
+**Returns:**
+- Unsubscribe function
+
+**Examples:**
+```typescript
+// Subscribe to field-specific updates
+const unsubscribe = store.on('user:updated', (patches) => {
+  console.log('User changed:', patches);
+});
+
+// Subscribe to all updates (wildcard)
+const unsubscribeAll = store.on('*', (patches) => {
+  console.log('State updated:', patches);
+});
+```
+
+#### `off(event: EventNames<T>, callback: (patches: Patches) => void): void`
+
+Unsubscribes from an event.
+
+**Parameters:**
+- `event` - The event name in format `${fieldName}:updated` or `'*'`
+- `callback` - The exact callback function to remove
+
+**Examples:**
+```typescript
+const callback = (patches) => console.log('Updated:', patches);
+store.on('user:updated', callback);
+
+// Later:
+store.off('user:updated', callback);
+
+// Or for wildcard:
+store.off('*', callback);
+```
+
+#### `once(event: EventNames<T>, callback: (patches: Patches) => void): () => void`
+
+Subscribes to an event for a single emission only.
+
+**Parameters:**
+- `event` - The event name in format `${fieldName}:updated` or `'*'` for all updates
+- `callback` - Callback function that receives the patches array
+
+**Returns:**
+- Unsubscribe function to remove listener before it fires
+
+**Examples:**
+```typescript
+// Subscribe for single emission to specific field
+const unsubscribe = store.once('user:updated', (patches) => {
+  console.log('User changed once:', patches);
+});
+
+// Subscribe for single emission to all updates
+const unsubscribeAll = store.once('*', (patches) => {
+  console.log('State updated once:', patches);
+});
 ```
 
 #### `onKeyed<K extends keyof T>(event: EventName<K>, key: Key, callback: (patches: Patches) => void): () => void`

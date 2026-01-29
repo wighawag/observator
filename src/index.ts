@@ -67,7 +67,7 @@ type RecursiveMap<Key, Value> = Map<Key, {value?: Value; children?: RecursiveMap
  * ```
  */
 export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
-	private emitter: Emitter<any, KeyedObservableEventMap<T>>;
+	private emitter: Emitter<any, any>;
 
 	public subscriptions: SubscriptionsMap<T>;
 	public keyedSubscriptions: KeyedSubscriptionsMap<T>;
@@ -108,6 +108,9 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 
 		// Group patches by top-level field key
 		const {all, topLevel} = this.groupPatchesByField(patches);
+
+		// Emit wildcard event with all patches
+		this.emitter.emit('*', patches);
 
 		// Emit events for each field that changed
 		for (const [fieldKey, fieldPatches] of all.entries()) {
@@ -159,7 +162,7 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	/**
 	 * Subscribe to updates for a specific field
 	 *
-	 * @param event - The event name in format `${fieldName}:updated`
+	 * @param event - The event name in format `${fieldName}:updated` or '*' to listen to all updates
 	 * @param callback - Callback function that receives the patches array
 	 * @returns Unsubscribe function
 	 *
@@ -172,17 +175,14 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 * // Later: unsubscribe();
 	 * ```
 	 */
-	public on<K extends keyof T>(
-		event: EventName<K & string>,
-		callback: (patches: Patches) => void,
-	): () => void {
+	public on(event: EventNames<T>, callback: (patches: Patches) => void): () => void {
 		return this.emitter.on(event, callback);
 	}
 
 	/**
 	 * Unsubscribe from a specific field event
 	 *
-	 * @param event - The event name in format `${fieldName}:updated`
+	 * @param event - The event name in format `${fieldName}:updated` or '*' to unsubscribe from the wildcard event
 	 * @param callback - The exact callback function to remove
 	 *
 	 * @example
@@ -194,17 +194,14 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 * store.off('user:updated', callback);
 	 * ```
 	 */
-	public off<K extends keyof T>(
-		event: EventName<K & string>,
-		callback: (patches: Patches) => void,
-	): void {
+	public off(event: EventNames<T>, callback: (patches: Patches) => void): void {
 		this.emitter.off(event, callback);
 	}
 
 	/**
 	 * Subscribe to updates for a specific field for a single emission only
 	 *
-	 * @param event - The event name in format `${fieldName}:updated`
+	 * @param event - The event name in format `${fieldName}:updated` or '*' to listen to all updates for a single emission
 	 * @param callback - Callback function that receives the patches array
 	 * @returns Unsubscribe function to remove listener before it fires
 	 *
@@ -218,10 +215,7 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 * // Callback will fire once, then automatically unsubscribe
 	 * ```
 	 */
-	public once<K extends keyof T>(
-		event: EventName<K & string>,
-		callback: (patches: Patches) => void,
-	): () => void {
+	public once(event: EventNames<T>, callback: (patches: Patches) => void): () => void {
 		return this.emitter.once(event, callback);
 	}
 

@@ -14,7 +14,7 @@ export type EventName<K extends string> = `${K}:updated`;
  */
 export type EventNames<T extends Record<string, unknown>> = {
 	[K in keyof T]: EventName<K & string>;
-}[keyof T];
+}[keyof T] | '*';
 
 export type Key = string | number | symbol | object;
 

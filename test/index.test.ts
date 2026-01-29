@@ -1663,5 +1663,300 @@ describe('ObservableStore', () => {
 			const receivedValue = callback.mock.calls[0][0];
 			expect(receivedValue).toEqual({'user-1': {name: 'Johnny'}});
 		});
+
+		describe('Wildcard event "*"', () => {
+			it('should subscribe to all updates with wildcard event', () => {
+				type State = {
+					count: {value: number};
+					name: {value: string};
+				};
+
+				const store = createObservableStore<State>({
+					count: {value: 0},
+					name: {value: 'test'},
+				});
+
+				const callback = vi.fn();
+				store.on('*', callback);
+
+				store.update((state) => {
+					state.count.value += 1;
+				});
+
+				expect(callback).toHaveBeenCalledTimes(1);
+				const patches = callback.mock.calls[0][0];
+				expect(patches).toEqual([
+					{
+						op: 'replace',
+						path: ['count', 'value'],
+						value: 1,
+					},
+				]);
+			});
+
+			it('should receive all patches from multiple field updates', () => {
+				type State = {
+					count: {value: number};
+					name: {value: string};
+				};
+
+				const store = createObservableStore<State>({
+					count: {value: 0},
+					name: {value: 'test'},
+				});
+
+				const callback = vi.fn();
+				store.on('*', callback);
+
+				store.update((state) => {
+					state.count.value += 1;
+					state.name.value = 'updated';
+				});
+
+				expect(callback).toHaveBeenCalledTimes(1);
+				const patches = callback.mock.calls[0][0];
+				expect(patches).toHaveLength(2);
+				expect(patches[0]).toEqual({
+					op: 'replace',
+					path: ['count', 'value'],
+					value: 1,
+				});
+				expect(patches[1]).toEqual({
+					op: 'replace',
+					path: ['name', 'value'],
+					value: 'updated',
+				});
+			});
+
+			it('should allow multiple wildcard subscribers', () => {
+				type State = {
+					count: {value: number};
+				};
+
+				const store = createObservableStore<State>({
+					count: {value: 0},
+				});
+
+				const callback1 = vi.fn();
+				const callback2 = vi.fn();
+
+				store.on('*', callback1);
+				store.on('*', callback2);
+
+				store.update((state) => {
+					state.count.value += 1;
+				});
+
+				expect(callback1).toHaveBeenCalledTimes(1);
+				expect(callback2).toHaveBeenCalledTimes(1);
+			});
+
+			it('should allow unsubscribing from wildcard event', () => {
+				type State = {
+					count: {value: number};
+				};
+
+				const store = createObservableStore<State>({
+					count: {value: 0},
+				});
+
+				const callback = vi.fn();
+				const unsubscribe = store.on('*', callback);
+
+				store.update((state) => {
+					state.count.value += 1;
+				});
+
+				expect(callback).toHaveBeenCalledTimes(1);
+
+				unsubscribe();
+
+				store.update((state) => {
+					state.count.value += 1;
+				});
+
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should support once for wildcard event', () => {
+				type State = {
+					count: {value: number};
+				};
+
+				const store = createObservableStore<State>({
+					count: {value: 0},
+				});
+
+				const callback = vi.fn();
+				store.once('*', callback);
+
+				store.update((state) => {
+					state.count.value += 1;
+				});
+
+				expect(callback).toHaveBeenCalledTimes(1);
+
+				store.update((state) => {
+					state.count.value += 1;
+				});
+
+				expect(callback).toHaveBeenCalledTimes(1); // Still only once
+			});
+
+			it('should support off for wildcard event', () => {
+				type State = {
+					count: {value: number};
+				};
+
+				const store = createObservableStore<State>({
+					count: {value: 0},
+				});
+
+				const callback1 = vi.fn();
+				const callback2 = vi.fn();
+
+				store.on('*', callback1);
+				store.on('*', callback2);
+
+				store.update((state) => {
+					state.count.value += 1;
+				});
+
+				expect(callback1).toHaveBeenCalledTimes(1);
+				expect(callback2).toHaveBeenCalledTimes(1);
+
+				store.off('*', callback1);
+
+				store.update((state) => {
+					state.count.value += 1;
+				});
+
+				expect(callback1).toHaveBeenCalledTimes(1); // Unsubscribed
+				expect(callback2).toHaveBeenCalledTimes(2); // Still listening
+			});
+
+			it('should allow unsubscribing once listener before it fires', () => {
+				type State = {
+					count: {value: number};
+				};
+
+				const store = createObservableStore<State>({
+					count: {value: 0},
+				});
+
+				const callback = vi.fn();
+				const unsubscribe = store.once('*', callback);
+
+				unsubscribe();
+
+				store.update((state) => {
+					state.count.value += 1;
+				});
+
+				expect(callback).toHaveBeenCalledTimes(0);
+			});
+
+			it('should work alongside field-specific events', () => {
+				type State = {
+					count: {value: number};
+					name: {value: string};
+				};
+
+				const store = createObservableStore<State>({
+					count: {value: 0},
+					name: {value: 'test'},
+				});
+
+				const wildcardCallback = vi.fn();
+				const countCallback = vi.fn();
+
+				store.on('*', wildcardCallback);
+				store.on('count:updated', countCallback);
+
+				store.update((state) => {
+					state.count.value += 1;
+				});
+
+				expect(wildcardCallback).toHaveBeenCalledTimes(1);
+				expect(countCallback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should receive all patches across multiple updates', () => {
+				type State = {
+					count: {value: number};
+				};
+
+				const store = createObservableStore<State>({
+					count: {value: 0},
+				});
+
+				const callback = vi.fn();
+				store.on('*', callback);
+
+				store.update((state) => {
+					state.count.value = 1;
+				});
+
+				store.update((state) => {
+					state.count.value = 2;
+				});
+
+				store.update((state) => {
+					state.count.value = 3;
+				});
+
+				expect(callback).toHaveBeenCalledTimes(3);
+
+				// Check first update
+				expect(callback.mock.calls[0][0]).toEqual([
+					{op: 'replace', path: ['count', 'value'], value: 1},
+				]);
+
+				// Check second update
+				expect(callback.mock.calls[1][0]).toEqual([
+					{op: 'replace', path: ['count', 'value'], value: 2},
+				]);
+
+				// Check third update
+				expect(callback.mock.calls[2][0]).toEqual([
+					{op: 'replace', path: ['count', 'value'], value: 3},
+				]);
+			});
+
+			it('should handle complex nested structures', () => {
+				type State = {
+					data: {
+						users: {
+							byId: Record<string, {name: string; email: string}>;
+							ids: string[];
+						};
+					};
+				};
+
+				const store = createObservableStore<State>({
+					data: {
+						users: {
+							byId: {
+								'1': {name: 'John', email: 'john@example.com'},
+							},
+							ids: ['1'],
+						},
+					},
+				});
+
+				const callback = vi.fn();
+				store.on('*', callback);
+
+				store.update((state) => {
+					state.data.users.byId['2'] = {name: 'Jane', email: 'jane@example.com'};
+					state.data.users.ids.push('2');
+				});
+
+				expect(callback).toHaveBeenCalledTimes(1);
+				const patches = callback.mock.calls[0][0];
+				expect(patches.length).toBeGreaterThan(0);
+				expect(patches.some((p: {path: PatchPath}) => p.path[0] === 'data')).toBe(true);
+			});
+		});
 	});
 });
