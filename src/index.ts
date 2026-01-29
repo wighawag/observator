@@ -12,6 +12,7 @@ import {
 	Patches,
 	SubscriptionsMap,
 	CreateFunction,
+	PatchPath,
 } from './types.js';
 
 function createFromPatchRecorder<T extends NonPrimitive>(
@@ -24,6 +25,8 @@ function createFromPatchRecorder<T extends NonPrimitive>(
 export type ObservableStoreOptions = {
 	createFunction?: CreateFunction;
 };
+
+type RecursiveMap<Key, Value> = Map<Key, {value?: Value; children?: RecursiveMap<Key, Value>}>;
 
 /**
  * Type-safe observable store that emits events for each top-level field change.
@@ -71,6 +74,9 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	public keyedSubscriptions: KeyedSubscriptionsMap<T>;
 
 	private create: CreateFunction;
+
+	private specificListeners: RecursiveMap<PatchPath, {listeners: ((patches: Patches) => void)[]}> =
+		new Map();
 
 	constructor(
 		protected state: T,
@@ -120,6 +126,23 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 				}
 			}
 		}
+
+		// TODO
+		// we have a private field RecursiveMap<PatchPath, Listener<Patches>[]> that record listener for specific path
+		//   this even support object keys and symbol
+		//   if we have at least one listener like that (we should have a boolean acting as a cache or something)
+		// if (hasSpecificListeners()) {
+		//  then we collect the patches corresponding to the specific listeners
+		//  TODO this map need to be crated to reflect the current listeners, adding an empty array for each path a listener is registered
+		//    we could also instead use the listener map to also store the patches to be used: RecursiveMap<PatchPath, {listeners: ((patches: Patches) => void)[], patches: Patches}>
+		//    if so we would need to reset them to empty array before proceeding
+		//  This should be easy as it would follow the same RecursiveMap structure
+		// 	const mapOfSpecificListener: RecursiveMap<PatchPath, Patches> = new Map();
+		//  then we already implemented collectPatchesForSpecificListeners
+		// 	this.collectPatchesForSpecificListeners(patches, mapOfSpecificListener);
+		//  finally we recurse through both map and execute the listeners with the respective path
+		// 	recurseThroughPatchesAndExecuteListener(mapOfSpecificListener)
+		// }
 
 		return patches;
 	}
@@ -482,6 +505,26 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 		}
 
 		return {topLevel, all};
+	}
+
+	private collectPatchesForSpecificListeners(
+		patches: Patches,
+		mapOfSpecificListeners: RecursiveMap<Key, Patches>,
+	) {
+		for (const patch of patches) {
+			let currentMap = mapOfSpecificListeners;
+			for (const key of patch.path) {
+				if (currentMap.has(key)) {
+					const node = currentMap.get(key);
+					if (node?.children) {
+						currentMap = node.children;
+					}
+					if (node?.value) {
+						node.value?.push(patch);
+					}
+				}
+			}
+		}
 	}
 }
 
