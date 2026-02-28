@@ -51,11 +51,9 @@ describe('ObservableStore', () => {
 			const callback = vi.fn();
 			store.on('count:updated', callback);
 
-			console.log(
-				store.update((state) => {
-					state.count += 1;
-				}),
-			);
+			store.update((state) => {
+				state.count += 1;
+			});
 
 			expect(store.get('count')).toEqual(1);
 			expect(callback).toHaveBeenCalledTimes(1);
@@ -888,11 +886,9 @@ describe('ObservableStore', () => {
 				const callback = vi.fn();
 				store.on('user:updated', callback);
 
-				console.log(
-					store.update((state) => {
-						Object.assign(state, {user: {name: 'Bob', age: 25}});
-					}),
-				);
+				store.update((state) => {
+					Object.assign(state, {user: {name: 'Bob', age: 25}});
+				});
 
 				expect(store.get('user')).toEqual({name: 'Bob', age: 25});
 				expect(callback).toHaveBeenCalled();
