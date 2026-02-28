@@ -14,6 +14,23 @@ import {
 	PatchPath,
 } from './types.js';
 
+// Re-export types for consumers
+export type {
+	EventName,
+	EventNames,
+	ExtractKeyType,
+	Key,
+	KeyedObservableEventMap,
+	KeyedSubscriptionsMap,
+	NonPrimitive,
+	Patches,
+	Patch,
+	PatchOp,
+	PatchPath,
+	SubscriptionsMap,
+	CreateFunction,
+} from './types.js';
+
 function createFromPatchRecorder<T extends NonPrimitive>(
 	state: T,
 	mutate: (state: T) => void,

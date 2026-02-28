@@ -37,6 +37,10 @@ importers:
         version: 4.0.18(@vitest/browser-playwright@4.0.18)(tsx@4.21.0)
 
   packages/observator-svelte:
+    dependencies:
+      observator:
+        specifier: workspace:*
+        version: link:../observator
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^7.0.0

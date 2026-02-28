@@ -31,6 +31,9 @@
 			"svelte": "./dist/index.js"
 		}
 	},
+	"dependencies": {
+		"observator": "workspace:*"
+	},
 	"peerDependencies": {
 		"svelte": "^5.0.0"
 	},
