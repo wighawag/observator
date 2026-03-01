@@ -2085,4 +2085,817 @@ describe('ObservableStore', () => {
 			});
 		});
 	});
+
+	describe('Array operations', () => {
+		describe('Array element removal', () => {
+			it('should emit patches when array element is removed with splice', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items.splice(1, 1); // Remove second element
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 1, text: 'First'},
+					{id: 3, text: 'Third'},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+				const patches = callback.mock.calls[0][0];
+				// Should contain patches for the removal
+				expect(patches.length).toBeGreaterThan(0);
+			});
+
+			it('should emit patches when array element is removed with pop', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items.pop();
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 1, text: 'First'},
+					{id: 2, text: 'Second'},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+				const patches = callback.mock.calls[0][0];
+				expect(patches.length).toBeGreaterThan(0);
+			});
+
+			it('should emit patches when array element is removed with shift', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items.shift();
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 2, text: 'Second'},
+					{id: 3, text: 'Third'},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+				const patches = callback.mock.calls[0][0];
+				expect(patches.length).toBeGreaterThan(0);
+			});
+
+			it('should emit keyed events for affected indices when element is removed', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback0 = vi.fn();
+				const callback1 = vi.fn();
+				const callback2 = vi.fn();
+
+				store.onKeyed('items:updated', 0, callback0);
+				store.onKeyed('items:updated', 1, callback1);
+				store.onKeyed('items:updated', 2, callback2);
+
+				store.update((state) => {
+					state.items.splice(0, 1); // Remove first element
+				});
+
+				// All affected indices should receive events
+				// Index 0 changes from {id:1} to {id:2}
+				// Index 1 changes from {id:2} to {id:3}
+				// Index 2 is removed
+				expect(callback0).toHaveBeenCalled();
+			});
+
+			it('should handle removing multiple elements at once', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+						{id: 4, text: 'Fourth'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items.splice(1, 2); // Remove second and third elements
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 1, text: 'First'},
+					{id: 4, text: 'Fourth'},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle filter-like removal pattern', () => {
+				type State = {
+					items: Array<{id: number; text: string; done: boolean}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First', done: true},
+						{id: 2, text: 'Second', done: false},
+						{id: 3, text: 'Third', done: true},
+						{id: 4, text: 'Fourth', done: false},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					// Remove all done items by iterating backwards
+					for (let i = state.items.length - 1; i >= 0; i--) {
+						if (state.items[i].done) {
+							state.items.splice(i, 1);
+						}
+					}
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 2, text: 'Second', done: false},
+					{id: 4, text: 'Fourth', done: false},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle assigning a new filtered array', () => {
+				type State = {
+					items: Array<{id: number; text: string; done: boolean}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First', done: true},
+						{id: 2, text: 'Second', done: false},
+						{id: 3, text: 'Third', done: true},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items = state.items.filter((item) => !item.done);
+				});
+
+				expect(store.get('items')).toEqual([{id: 2, text: 'Second', done: false}]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+		});
+
+		describe('Array element reordering', () => {
+			it('should emit patches when array elements are swapped', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					// Swap first and last elements
+					const temp = state.items[0];
+					state.items[0] = state.items[2];
+					state.items[2] = temp;
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 3, text: 'Third'},
+					{id: 2, text: 'Second'},
+					{id: 1, text: 'First'},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+				const patches = callback.mock.calls[0][0];
+				expect(patches.length).toBeGreaterThan(0);
+			});
+
+			it('should emit patches when array is reversed', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items.reverse();
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 3, text: 'Third'},
+					{id: 2, text: 'Second'},
+					{id: 1, text: 'First'},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should emit patches when array is sorted', () => {
+				type State = {
+					items: Array<{id: number; text: string; priority: number}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'Low', priority: 3},
+						{id: 2, text: 'High', priority: 1},
+						{id: 3, text: 'Medium', priority: 2},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items.sort((a, b) => a.priority - b.priority);
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 2, text: 'High', priority: 1},
+					{id: 3, text: 'Medium', priority: 2},
+					{id: 1, text: 'Low', priority: 3},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should emit keyed events for affected indices when elements are reordered', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback0 = vi.fn();
+				const callback1 = vi.fn();
+				const callback2 = vi.fn();
+
+				store.onKeyed('items:updated', 0, callback0);
+				store.onKeyed('items:updated', 1, callback1);
+				store.onKeyed('items:updated', 2, callback2);
+
+				store.update((state) => {
+					// Swap first and last elements
+					const temp = state.items[0];
+					state.items[0] = state.items[2];
+					state.items[2] = temp;
+				});
+
+				// Indices 0 and 2 changed, index 1 stayed the same
+				expect(callback0).toHaveBeenCalled();
+				expect(callback2).toHaveBeenCalled();
+			});
+
+			it('should handle move item to end pattern', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					// Move first item to end
+					const [first] = state.items.splice(0, 1);
+					state.items.push(first);
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 2, text: 'Second'},
+					{id: 3, text: 'Third'},
+					{id: 1, text: 'First'},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle move item to beginning pattern', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					// Move last item to beginning
+					const last = state.items.pop();
+					if (last) state.items.unshift(last);
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 3, text: 'Third'},
+					{id: 1, text: 'First'},
+					{id: 2, text: 'Second'},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle splice-based reordering', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+						{id: 4, text: 'Fourth'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					// Move item from index 3 to index 1
+					const [item] = state.items.splice(3, 1);
+					state.items.splice(1, 0, item);
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 1, text: 'First'},
+					{id: 4, text: 'Fourth'},
+					{id: 2, text: 'Second'},
+					{id: 3, text: 'Third'},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle reassigning sorted array', () => {
+				type State = {
+					items: Array<{id: number; text: string; priority: number}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'Low', priority: 3},
+						{id: 2, text: 'High', priority: 1},
+						{id: 3, text: 'Medium', priority: 2},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					// Create a new sorted array
+					state.items = [...state.items].sort((a, b) => a.priority - b.priority);
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 2, text: 'High', priority: 1},
+					{id: 3, text: 'Medium', priority: 2},
+					{id: 1, text: 'Low', priority: 3},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+		});
+
+		describe('Combined array operations', () => {
+			it('should handle adding and removing in same update', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items.splice(1, 1); // Remove second
+					state.items.push({id: 4, text: 'Fourth'}); // Add new one
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 1, text: 'First'},
+					{id: 3, text: 'Third'},
+					{id: 4, text: 'Fourth'},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle replacing all items', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items = [
+						{id: 3, text: 'New First'},
+						{id: 4, text: 'New Second'},
+						{id: 5, text: 'New Third'},
+					];
+				});
+
+				expect(store.get('items')).toEqual([
+					{id: 3, text: 'New First'},
+					{id: 4, text: 'New Second'},
+					{id: 5, text: 'New Third'},
+				]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle clearing array', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items.length = 0;
+				});
+
+				expect(store.get('items')).toEqual([]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle clearing array with splice', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items.splice(0, state.items.length);
+				});
+
+				expect(store.get('items')).toEqual([]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle reassigning empty array', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+					],
+				});
+
+				const callback = vi.fn();
+				store.on('items:updated', callback);
+
+				store.update((state) => {
+					state.items = [];
+				});
+
+				expect(store.get('items')).toEqual([]);
+				expect(callback).toHaveBeenCalledTimes(1);
+			});
+		});
+
+		describe('Keyed events for array operations', () => {
+			it('should emit keyed event for index when pushed', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+					],
+				});
+
+				const callback2 = vi.fn();
+				store.onKeyed('items:updated', 2, callback2);
+
+				// Push a new element (will be at index 2)
+				store.update((state) => {
+					state.items.push({id: 3, text: 'Third'});
+				});
+
+				// Keyed event for index 2 should fire on push
+				expect(callback2).toHaveBeenCalledTimes(1);
+				const pushPatches = callback2.mock.calls[0][0];
+				// Verify patch contains operation for index 2
+				expect(pushPatches.some((p: {op: string; path: unknown[]}) =>
+					p.path.includes(2) || p.path.includes('2')
+				)).toBe(true);
+			});
+
+			it('should verify patches contain correct operations for push', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+					],
+				});
+
+				const allPatches: Array<{op: string; path: unknown[]; value?: unknown}> = [];
+				store.on('items:updated', (patches) => {
+					allPatches.push(...patches);
+				});
+
+				// Push a new element
+				store.update((state) => {
+					state.items.push({id: 3, text: 'Third'});
+				});
+
+				// Verify patches exist and reference the new index
+				expect(allPatches.length).toBeGreaterThan(0);
+				// Check that patches reference index 2 (the added element)
+				const referencesIndex2 = allPatches.some((p) =>
+					p.path.includes(2) || p.path.includes('2')
+				);
+				expect(referencesIndex2).toBe(true);
+			});
+
+			it('documents pop behavior: patches may not reference removed index directly', () => {
+				// IMPORTANT: This test documents the actual behavior of patch-recorder.
+				// When using pop(), the patches generated may not directly reference
+				// the removed index. This is because patch-recorder tracks mutations
+				// and pop simply removes the last element without "replacing" it.
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const allPatches: Array<{op: string; path: unknown[]; value?: unknown}> = [];
+				store.on('items:updated', (patches) => {
+					allPatches.push(...patches);
+				});
+
+				// Pop the last element
+				store.update((state) => {
+					state.items.pop();
+				});
+
+				// The field-level event fires
+				expect(allPatches.length).toBeGreaterThan(0);
+				// The array is correctly updated
+				expect(store.get('items')).toEqual([
+					{id: 1, text: 'First'},
+					{id: 2, text: 'Second'},
+				]);
+			});
+
+			it('should emit keyed events when using splice to remove', () => {
+				// splice generates patches differently - it replaces elements
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback0 = vi.fn();
+				const callback1 = vi.fn();
+
+				store.onKeyed('items:updated', 0, callback0);
+				store.onKeyed('items:updated', 1, callback1);
+
+				// Splice removes first element, shifting others
+				store.update((state) => {
+					state.items.splice(0, 1);
+				});
+
+				// Index 0 should fire (now contains {id:2} instead of {id:1})
+				expect(callback0).toHaveBeenCalled();
+				// Array should be correctly updated
+				expect(store.get('items')).toEqual([
+					{id: 2, text: 'Second'},
+					{id: 3, text: 'Third'},
+				]);
+			});
+
+			it('should emit keyed events for replacement at specific index', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const callback1 = vi.fn();
+				store.onKeyed('items:updated', 1, callback1);
+
+				// Replace item at index 1
+				store.update((state) => {
+					state.items[1] = {id: 99, text: 'Replaced'};
+				});
+
+				expect(callback1).toHaveBeenCalledTimes(1);
+				expect(store.get('items')[1]).toEqual({id: 99, text: 'Replaced'});
+			});
+
+			it('should handle push cycles with keyed listener', () => {
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+					],
+				});
+
+				const callback1 = vi.fn();
+				store.onKeyed('items:updated', 1, callback1);
+
+				// First push - creates index 1
+				store.update((state) => { state.items.push({id: 2, text: 'Second'}); });
+				expect(callback1).toHaveBeenCalledTimes(1);
+
+				// Modify index 1
+				store.update((state) => { state.items[1].text = 'Modified Second'; });
+				expect(callback1).toHaveBeenCalledTimes(2);
+
+				// Replace index 1
+				store.update((state) => { state.items[1] = {id: 3, text: 'Third'}; });
+				expect(callback1).toHaveBeenCalledTimes(3);
+
+				// Verify final state
+				expect(store.get('items')).toEqual([
+					{id: 1, text: 'First'},
+					{id: 3, text: 'Third'},
+				]);
+			});
+
+			it('should prefer field-level subscriptions for arrays over keyed indices', () => {
+				// This test documents the recommended pattern for array subscriptions.
+				// Since array indices represent positions (not identities), use:
+				// - Field-level subscriptions (items:updated) for the whole array
+				// - Item IDs as keys in UI frameworks (not indices)
+				type State = {
+					items: Array<{id: number; text: string}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [
+						{id: 1, text: 'First'},
+						{id: 2, text: 'Second'},
+						{id: 3, text: 'Third'},
+					],
+				});
+
+				const fieldCallback = vi.fn();
+				store.on('items:updated', fieldCallback);
+
+				// All these operations trigger the field-level event
+				store.update((state) => { state.items.pop(); });
+				expect(fieldCallback).toHaveBeenCalledTimes(1);
+
+				store.update((state) => { state.items.push({id: 4, text: 'Fourth'}); });
+				expect(fieldCallback).toHaveBeenCalledTimes(2);
+
+				store.update((state) => { state.items.shift(); });
+				expect(fieldCallback).toHaveBeenCalledTimes(3);
+
+				store.update((state) => { state.items.reverse(); });
+				expect(fieldCallback).toHaveBeenCalledTimes(4);
+
+				// Field-level subscription is the reliable pattern for arrays
+			});
+		});
+	});
 });

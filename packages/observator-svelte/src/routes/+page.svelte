@@ -105,6 +105,12 @@
 <main>
 	<h1>ObservableStore + Svelte 5 Demo</h1>
 	<p>This demo showcases fine-grained reactivity using <code>useSvelteReactivity</code>.</p>
+	
+	<section class="demo-link">
+		<h2>🎬 Animated Array List Demo</h2>
+		<p>See array operations (add, remove, reorder) with smooth animations!</p>
+		<a href="/animated-list" class="demo-button">View Animated List Demo →</a>
+	</section>
 
 	<section>
 		<h2>Counter (Field: counter)</h2>
@@ -264,5 +270,36 @@
 	input[type='checkbox'] {
 		width: 18px;
 		height: 18px;
+	}
+
+	.demo-link {
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		border: none;
+		color: white;
+	}
+
+	.demo-link h2 {
+		color: white;
+	}
+
+	.demo-link p {
+		color: rgba(255, 255, 255, 0.9);
+	}
+
+	.demo-button {
+		display: inline-block;
+		background: white;
+		color: #667eea;
+		padding: 0.75rem 1.5rem;
+		border-radius: 6px;
+		text-decoration: none;
+		font-weight: 600;
+		transition: all 0.2s ease;
+	}
+
+	.demo-button:hover {
+		background: #f0f0f0;
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 	}
 </style>
