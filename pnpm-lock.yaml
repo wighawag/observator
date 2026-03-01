@@ -14,8 +14,8 @@ importers:
         specifier: ^0.2.1
         version: 0.2.1
       radiate:
-        specifier: ^0.3.1
-        version: 0.3.1
+        specifier: ^0.3.2
+        version: 0.3.2
     devDependencies:
       as-soon:
         specifier: ^0.1.5
@@ -799,8 +799,8 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  radiate@0.3.1:
-    resolution: {integrity: sha512-GEOjOu0TJz8vJg/Pp612scKLDckd0G4Aiuf8ISR9vKH9qaLV1ndjlxRTHz9sRMi8ekoGALj/qnioUu4V/TLxCA==}
+  radiate@0.3.2:
+    resolution: {integrity: sha512-ANuZKiFcx4SNqgtxTazLcoPQK1Dr+ET0focgAJFZiLIukUt/k9AK+FgeUzEHmyUl18A4+S4Jt1GcoYuGHg9nwg==}
 
   readdirp@4.1.2:
     resolution: {integrity: sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg==}
@@ -1565,7 +1565,7 @@ snapshots:
       picocolors: 1.1.1
       sade: 1.8.1
 
-  radiate@0.3.1: {}
+  radiate@0.3.2: {}
 
   readdirp@4.1.2: {}
 
