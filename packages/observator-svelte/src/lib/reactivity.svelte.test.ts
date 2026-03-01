@@ -1123,5 +1123,540 @@ describe('Svelte Reactivity', () => {
 				cleanup();
 			});
 		});
+
+		describe('getItemId edge cases', () => {
+			it('should use field-level subscription when getItemId returns undefined', () => {
+				const cleanup = $effect.root(() => {
+					// Item without id field - getItemId returns undefined
+					const observableStore = createObservableStore(
+						{
+							items: [
+								{ value: 'no-id-item' } as { id?: string; value: string },
+								{ id: 'b', value: 'has-id-item' }
+							]
+						},
+						{ getItemId: { items: (item: { id?: string }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id?: string }) => item.id }
+					});
+
+					let item0Runs = 0;
+					let item1Runs = 0;
+
+					$effect(() => {
+						store.items[0];
+						untrack(() => item0Runs++);
+					});
+
+					$effect(() => {
+						store.items[1];
+						untrack(() => item1Runs++);
+					});
+
+					flushSync();
+					expect(item0Runs).toBe(1);
+					expect(item1Runs).toBe(1);
+
+					// Update item without ID - should trigger field-level subscription
+					store.update((s) => {
+						s.items[0].value = 'updated-no-id';
+					});
+
+					flushSync();
+					// Item without ID uses field-level subscription, so both effects may re-run
+					expect(item0Runs).toBeGreaterThanOrEqual(2);
+				});
+
+				cleanup();
+			});
+
+			it('should use field-level subscription when getItemId returns null', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [
+								{ id: null as string | null, value: 'null-id-item' },
+								{ id: 'b', value: 'has-id-item' }
+							]
+						},
+						{ getItemId: { items: (item: { id: string | null }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id: string | null }) => item.id }
+					});
+
+					let item0Runs = 0;
+
+					$effect(() => {
+						store.items[0];
+						untrack(() => item0Runs++);
+					});
+
+					flushSync();
+					expect(item0Runs).toBe(1);
+
+					// Update item with null ID - should trigger field-level subscription
+					store.update((s) => {
+						s.items[0].value = 'updated-null-id';
+					});
+
+					flushSync();
+					expect(item0Runs).toBeGreaterThanOrEqual(2);
+				});
+
+				cleanup();
+			});
+
+			it('should handle mixed items - some with valid IDs, some without', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [
+								{ id: 'a', value: 'has-id' },
+								{ value: 'no-id' } as { id?: string; value: string },
+								{ id: 'c', value: 'has-id-too' }
+							]
+						},
+						{ getItemId: { items: (item: { id?: string }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id?: string }) => item.id }
+					});
+
+					let item0Runs = 0;
+					let item1Runs = 0;
+					let item2Runs = 0;
+
+					$effect(() => {
+						store.items[0];
+						untrack(() => item0Runs++);
+					});
+
+					$effect(() => {
+						store.items[1];
+						untrack(() => item1Runs++);
+					});
+
+					$effect(() => {
+						store.items[2];
+						untrack(() => item2Runs++);
+					});
+
+					flushSync();
+					expect(item0Runs).toBe(1);
+					expect(item1Runs).toBe(1);
+					expect(item2Runs).toBe(1);
+
+					// Update item with valid ID 'a'
+					store.update((s) => {
+						s.items[0].value = 'updated-a';
+					});
+
+					flushSync();
+					// Only item 0 should re-run (ID-based subscription)
+					expect(item0Runs).toBe(2);
+					// Items 1 and 2 should NOT re-run
+					expect(item1Runs).toBe(1);
+					expect(item2Runs).toBe(1);
+
+					// Update item with valid ID 'c'
+					store.update((s) => {
+						s.items[2].value = 'updated-c';
+					});
+
+					flushSync();
+					// Only item 2 should re-run
+					expect(item0Runs).toBe(2);
+					expect(item1Runs).toBe(1);
+					expect(item2Runs).toBe(2);
+				});
+
+				cleanup();
+			});
+
+			it('should handle item with ID of 0 (falsy but valid)', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [
+								{ id: 0, value: 'zero-id' },
+								{ id: 1, value: 'one-id' }
+							]
+						},
+						{ getItemId: { items: (item: { id: number }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id: number }) => item.id }
+					});
+
+					let item0Runs = 0;
+					let item1Runs = 0;
+
+					$effect(() => {
+						store.items[0];
+						untrack(() => item0Runs++);
+					});
+
+					$effect(() => {
+						store.items[1];
+						untrack(() => item1Runs++);
+					});
+
+					flushSync();
+					expect(item0Runs).toBe(1);
+					expect(item1Runs).toBe(1);
+
+					// Update item with ID 0 - should use ID-based subscription
+					store.update((s) => {
+						s.items[0].value = 'updated-zero';
+					});
+
+					flushSync();
+					// ID 0 is valid, so only item 0 should re-run
+					expect(item0Runs).toBe(2);
+					expect(item1Runs).toBe(1);
+				});
+
+				cleanup();
+			});
+
+			it('should handle item with empty string ID (falsy but valid)', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [
+								{ id: '', value: 'empty-string-id' },
+								{ id: 'b', value: 'normal-id' }
+							]
+						},
+						{ getItemId: { items: (item: { id: string }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id: string }) => item.id }
+					});
+
+					let item0Runs = 0;
+					let item1Runs = 0;
+
+					$effect(() => {
+						store.items[0];
+						untrack(() => item0Runs++);
+					});
+
+					$effect(() => {
+						store.items[1];
+						untrack(() => item1Runs++);
+					});
+
+					flushSync();
+					expect(item0Runs).toBe(1);
+					expect(item1Runs).toBe(1);
+
+					// Update item with empty string ID - should use ID-based subscription
+					store.update((s) => {
+						s.items[0].value = 'updated-empty';
+					});
+
+					flushSync();
+					// Empty string is valid, so only item 0 should re-run
+					expect(item0Runs).toBe(2);
+					expect(item1Runs).toBe(1);
+				});
+
+				cleanup();
+			});
+
+			it('should handle pushing item without ID field', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [{ id: 'a', value: 'first' }] as Array<{ id?: string; value: string }>
+						},
+						{ getItemId: { items: (item: { id?: string }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id?: string }) => item.id }
+					});
+
+					const item1Values: string[] = [];
+
+					$effect(() => {
+						item1Values.push(store.items[1]?.value ?? 'none');
+					});
+
+					flushSync();
+					expect(item1Values).toEqual(['none']);
+
+					// Push item without ID
+					store.update((s) => {
+						s.items.push({ value: 'no-id-pushed' });
+					});
+
+					flushSync();
+					// Effect should re-run with the new value (field-level for items without ID)
+					expect(item1Values[item1Values.length - 1]).toBe('no-id-pushed');
+				});
+
+				cleanup();
+			});
+		});
+
+		describe('render efficiency', () => {
+			it('should NOT re-run effect when updating unrelated item with ID-based subscriptions', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [
+								{ id: 'a', value: 1 },
+								{ id: 'b', value: 2 },
+								{ id: 'c', value: 3 }
+							]
+						},
+						{ getItemId: { items: (item: { id: string }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id: string }) => item.id }
+					});
+
+					let itemARuns = 0;
+					let itemBRuns = 0;
+					let itemCRuns = 0;
+
+					$effect(() => {
+						store.items[0]?.value;
+						untrack(() => itemARuns++);
+					});
+
+					$effect(() => {
+						store.items[1]?.value;
+						untrack(() => itemBRuns++);
+					});
+
+					$effect(() => {
+						store.items[2]?.value;
+						untrack(() => itemCRuns++);
+					});
+
+					flushSync();
+					expect(itemARuns).toBe(1);
+					expect(itemBRuns).toBe(1);
+					expect(itemCRuns).toBe(1);
+
+					// Update only item B
+					store.update((s) => {
+						s.items[1].value = 200;
+					});
+
+					flushSync();
+					// ONLY item B effect should re-run
+					expect(itemARuns).toBe(1);
+					expect(itemBRuns).toBe(2);
+					expect(itemCRuns).toBe(1);
+
+					// Update only item A
+					store.update((s) => {
+						s.items[0].value = 100;
+					});
+
+					flushSync();
+					// ONLY item A effect should re-run
+					expect(itemARuns).toBe(2);
+					expect(itemBRuns).toBe(2);
+					expect(itemCRuns).toBe(1);
+
+					// Update only item C
+					store.update((s) => {
+						s.items[2].value = 300;
+					});
+
+					flushSync();
+					// ONLY item C effect should re-run
+					expect(itemARuns).toBe(2);
+					expect(itemBRuns).toBe(2);
+					expect(itemCRuns).toBe(2);
+				});
+
+				cleanup();
+			});
+
+			it('should only re-run affected effects when multiple items updated in one call', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [
+								{ id: 'a', value: 1 },
+								{ id: 'b', value: 2 },
+								{ id: 'c', value: 3 }
+							]
+						},
+						{ getItemId: { items: (item: { id: string }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id: string }) => item.id }
+					});
+
+					let itemARuns = 0;
+					let itemBRuns = 0;
+					let itemCRuns = 0;
+
+					$effect(() => {
+						store.items[0]?.value;
+						untrack(() => itemARuns++);
+					});
+
+					$effect(() => {
+						store.items[1]?.value;
+						untrack(() => itemBRuns++);
+					});
+
+					$effect(() => {
+						store.items[2]?.value;
+						untrack(() => itemCRuns++);
+					});
+
+					flushSync();
+
+					// Update items A and C, but not B
+					store.update((s) => {
+						s.items[0].value = 100;
+						s.items[2].value = 300;
+					});
+
+					flushSync();
+					// Items A and C should re-run, B should NOT
+					expect(itemARuns).toBe(2);
+					expect(itemBRuns).toBe(1);
+					expect(itemCRuns).toBe(2);
+				});
+
+				cleanup();
+			});
+		});
+
+		describe('list rendering patterns', () => {
+			it('should handle iterating over array with map-like pattern', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [
+								{ id: 'a', text: 'First' },
+								{ id: 'b', text: 'Second' },
+								{ id: 'c', text: 'Third' }
+							]
+						},
+						{ getItemId: { items: (item: { id: string }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id: string }) => item.id }
+					});
+
+					const renderedTexts: string[][] = [];
+
+					$effect(() => {
+						// Simulate iterating over items (like {#each store.items as item})
+						const texts: string[] = [];
+						for (let i = 0; i < store.items.length; i++) {
+							texts.push(store.items[i]?.text ?? 'none');
+						}
+						renderedTexts.push(texts);
+					});
+
+					flushSync();
+					expect(renderedTexts).toEqual([['First', 'Second', 'Third']]);
+
+					// Update one item
+					store.update((s) => {
+						s.items[1].text = 'Updated Second';
+					});
+
+					flushSync();
+					// Effect re-runs with updated values
+					expect(renderedTexts[renderedTexts.length - 1]).toEqual(['First', 'Updated Second', 'Third']);
+				});
+
+				cleanup();
+			});
+
+			it('should handle accessing array length', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore({
+						items: [
+							{ id: 0, text: 'First' },
+							{ id: 1, text: 'Second' }
+						]
+					});
+					const store = useSvelteReactivity(observableStore);
+
+					const lengths: number[] = [];
+
+					$effect(() => {
+						lengths.push(store.items.length);
+					});
+
+					flushSync();
+					expect(lengths).toEqual([2]);
+
+					// Push an item
+					store.update((s) => {
+						s.items.push({ id: 2, text: 'Third' });
+					});
+
+					flushSync();
+					expect(lengths[lengths.length - 1]).toBe(3);
+
+					// Pop an item
+					store.update((s) => {
+						s.items.pop();
+					});
+
+					flushSync();
+					expect(lengths[lengths.length - 1]).toBe(2);
+				});
+
+				cleanup();
+			});
+
+			it('should handle conditional rendering based on item existence', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [{ id: 'a', text: 'First' }]
+						},
+						{ getItemId: { items: (item: { id: string }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id: string }) => item.id }
+					});
+
+					const item1Exists: boolean[] = [];
+
+					$effect(() => {
+						item1Exists.push(store.items[1] !== undefined);
+					});
+
+					flushSync();
+					expect(item1Exists).toEqual([false]);
+
+					// Push an item
+					store.update((s) => {
+						s.items.push({ id: 'b', text: 'Second' });
+					});
+
+					flushSync();
+					expect(item1Exists[item1Exists.length - 1]).toBe(true);
+
+					// Pop it
+					store.update((s) => {
+						s.items.pop();
+					});
+
+					flushSync();
+					expect(item1Exists[item1Exists.length - 1]).toBe(false);
+				});
+
+				cleanup();
+			});
+		});
 	});
 });
