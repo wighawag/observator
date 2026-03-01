@@ -11,8 +11,8 @@ importers:
   packages/observator:
     dependencies:
       patch-recorder:
-        specifier: ^0.2.2
-        version: 0.2.2
+        specifier: ^0.4.0
+        version: 0.4.0
       radiate:
         specifier: ^0.3.2
         version: 0.3.2
@@ -748,8 +748,8 @@ packages:
   package-manager-detector@1.6.0:
     resolution: {integrity: sha512-61A5ThoTiDG/C8s8UMZwSorAGwMJ0ERVGj2OjoW5pAalsNOg15+iQiPzrLJ4jhZ1HJzmC2PIHT2oEiH3R5fzNA==}
 
-  patch-recorder@0.2.2:
-    resolution: {integrity: sha512-IGTkn1AaHBH+Y6DSD4NbTYFvii5cO+vmWY32GCepkv7kkulg2E2rXeHOD4/Y0tK3F0LvBbZXYJfkVtDeXvODoQ==}
+  patch-recorder@0.4.0:
+    resolution: {integrity: sha512-ud2E1M3hFtlb12bVj/1llFfNx6x+XV5Sq2VJHmzTAsmofj6Vne64SHWa1vAtDyrOZ8DTaDk5BqeiHMcAbt+VXg==}
 
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
@@ -1523,7 +1523,7 @@ snapshots:
 
   package-manager-detector@1.6.0: {}
 
-  patch-recorder@0.2.2: {}
+  patch-recorder@0.4.0: {}
 
   pathe@2.0.3: {}
 

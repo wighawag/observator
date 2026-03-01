@@ -43,7 +43,7 @@
 	],
 	"sideEffects": false,
 	"dependencies": {
-		"patch-recorder": "^0.2.2",
+		"patch-recorder": "^0.4.0",
 		"radiate": "^0.3.2"
 	},
 	"devDependencies": {
