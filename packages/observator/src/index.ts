@@ -124,7 +124,7 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 		this.state = newState;
 
 		// Group patches by top-level field key
-		const {all, topLevel} = this.groupPatchesByField(patches);
+		const {all, topLevel, replacedFields} = this.groupPatchesByField(patches);
 
 		// Emit wildcard event with all patches
 		this.emitter.emit('*', patches);
@@ -139,6 +139,15 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 			// Conditionally emit keyed events only when there are listeners (performance optimization)
 			if (this.emitter.hasKeyedListeners(eventName)) {
 				const changedKeys = this.extractSecondKeysFromPatches(fieldPatches);
+
+				// If field was replaced, notify all registered keyed listeners
+				if (replacedFields.has(fieldKey)) {
+					const registeredKeys = this.emitter.getKeyedListenerKeys(eventName);
+					for (const key of registeredKeys) {
+						changedKeys.add(key as Key);
+					}
+				}
+
 				for (const changedKey of changedKeys) {
 					// Type assertions needed due to TypeScript limitations with generic string literals
 					this.emitter.emitKeyed(eventName, changedKey as any, fieldPatches as any);
@@ -482,9 +491,11 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	private groupPatchesByField(patches: Patches): {
 		topLevel: Map<string, Patches>;
 		all: Map<string, Patches>;
+		replacedFields: Set<string>;
 	} {
 		const topLevel: Map<string, Patches> = new Map();
 		const all: Map<string, Patches> = new Map();
+		const replacedFields = new Set<string>();
 
 		for (const patch of patches) {
 			if (patch.path.length === 0) {
@@ -494,6 +505,12 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 			}
 
 			const fieldKey = patch.path[0] as string; // top level is string, type enforce it, we could throw upon initialisation ?
+
+			// Track field replacements (patches with path.length === 1)
+			if (patch.path.length === 1) {
+				replacedFields.add(fieldKey);
+			}
+
 			if (patch.path.length === 1 || patch.path.length === 2) {
 				// we are dealing with patch affecting the field directly
 				let topLevelGroup = topLevel.get(fieldKey);
@@ -514,7 +531,7 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 			allGroup.push(patch);
 		}
 
-		return {topLevel, all};
+		return {topLevel, all, replacedFields};
 	}
 
 	private collectPatchesForSpecificListeners(

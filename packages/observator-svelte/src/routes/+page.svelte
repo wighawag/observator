@@ -144,19 +144,19 @@
 
 	<section>
 		<h2>Users (Keyed Access)</h2>
-		<p>Using <code>store.keyed.users(id)</code> for keyed reactivity:</p>
+		<p>Using <code>store.users[userId]</code> for automatic keyed reactivity:</p>
 		<div class="users-grid">
 			{#each Object.keys(store.users) as userId}
 				<div class="user-card">
-					<p><strong>{store.keyed.users(userId)?.name}</strong></p>
-					<p class:online={store.keyed.users(userId)?.online}>
-						{store.keyed.users(userId)?.online ? '🟢 Online' : '🔴 Offline'}
+					<p><strong>{store.users[userId]?.name}</strong></p>
+					<p class:online={store.users[userId]?.online}>
+						{store.users[userId]?.online ? '🟢 Online' : '🔴 Offline'}
 					</p>
 					<button onclick={() => toggleUserOnline(userId)}>Toggle Status</button>
 				</div>
 			{/each}
 		</div>
-		<p class="note">Each user card can react independently using keyed subscriptions.</p>
+		<p class="note">Each user card can react independently using automatic keyed subscriptions via proxy.</p>
 	</section>
 
 	<section>

@@ -2,8 +2,7 @@
 export {
 	useSvelteReactivity,
 	ReactiveStore,
-	type ReactiveStoreWithFields,
-	type KeyedAccessors
+	type ReactiveStoreWithFields
 } from './store.svelte.js';
 
 // Re-export useful types from observator

@@ -39,12 +39,12 @@
 	// We need to check if users exists at the store level without triggering reactivity
 	const hasUsers = () => store.getRaw('users') !== undefined;
 
-	// Effects for keyed access (alice and bob) - only subscribe to keyed, not the whole field
+	// Effects for keyed access (alice and bob) - using transparent proxy access
 	$effect(() => {
 		// Only subscribe to keyed alice - don't read the whole users field
 		const users = untrack(() => store.getRaw('users'));
 		if (users) {
-			store.keyed.users?.('alice'); // Subscribe to alice keyed event only
+			store.users?.alice; // Subscribe to alice keyed event via proxy
 		}
 		untrack(() => {
 			aliceRenderCount++;
@@ -55,7 +55,7 @@
 		// Only subscribe to keyed bob - don't read the whole users field
 		const users = untrack(() => store.getRaw('users'));
 		if (users) {
-			store.keyed.users?.('bob'); // Subscribe to bob keyed event only
+			store.users?.bob; // Subscribe to bob keyed event via proxy
 		}
 		untrack(() => {
 			bobRenderCount++;
@@ -71,10 +71,10 @@
 
 	{#if hasUsers()}
 		<div data-testid="alice-status">
-			{store.keyed.users?.('alice')?.online ? 'online' : 'offline'}
+			{store.users?.alice?.online ? 'online' : 'offline'}
 		</div>
 		<div data-testid="bob-status">
-			{store.keyed.users?.('bob')?.online ? 'online' : 'offline'}
+			{store.users?.bob?.online ? 'online' : 'offline'}
 		</div>
 		<div data-testid="alice-renders">{aliceRenderCount}</div>
 		<div data-testid="bob-renders">{bobRenderCount}</div>

@@ -151,8 +151,8 @@ describe('useSvelteReactivity', () => {
 		});
 	});
 
-	describe('keyed access', () => {
-		it('should have keyed accessors for Record fields', () => {
+	describe('proxy-based property access', () => {
+		it('should access Record field properties directly', () => {
 			const observableStore = createObservableStore({
 				users: {
 					alice: { name: 'Alice', online: true },
@@ -161,24 +161,41 @@ describe('useSvelteReactivity', () => {
 			});
 			const store = useSvelteReactivity(observableStore);
 
-			expect(store.keyed.users('alice')).toEqual({ name: 'Alice', online: true });
-			expect(store.keyed.users('bob')).toEqual({ name: 'Bob', online: false });
-			expect(store.keyed.users('unknown')).toBeUndefined();
+			// Direct property access via proxy
+			expect(store.users.alice).toEqual({ name: 'Alice', online: true });
+			expect(store.users.bob).toEqual({ name: 'Bob', online: false });
+			expect(store.users.unknown).toBeUndefined();
 		});
 
-		it('should have keyed accessors for Array fields', () => {
+		it('should access Array field elements directly', () => {
 			const observableStore = createObservableStore({
 				items: ['a', 'b', 'c']
 			});
 			const store = useSvelteReactivity(observableStore);
 
-			expect(store.keyed.items(0)).toBe('a');
-			expect(store.keyed.items(1)).toBe('b');
-			expect(store.keyed.items(2)).toBe('c');
-			expect(store.keyed.items(10)).toBeUndefined();
+			// Direct index access via proxy
+			expect(store.items[0]).toBe('a');
+			expect(store.items[1]).toBe('b');
+			expect(store.items[2]).toBe('c');
+			expect(store.items[10]).toBeUndefined();
 		});
 
-		it('should return updated keyed values after mutation', () => {
+		it('should access nested properties', () => {
+			const observableStore = createObservableStore({
+				user: {
+					name: 'John',
+					address: { city: 'NYC', zip: '10001' }
+				}
+			});
+			const store = useSvelteReactivity(observableStore);
+
+			// Nested property access
+			expect(store.user.name).toBe('John');
+			expect(store.user.address.city).toBe('NYC');
+			expect(store.user.address.zip).toBe('10001');
+		});
+
+		it('should return updated values after mutation', () => {
 			const observableStore = createObservableStore({
 				users: {
 					alice: { name: 'Alice', online: true }
@@ -190,7 +207,95 @@ describe('useSvelteReactivity', () => {
 				state.users.alice.online = false;
 			});
 
-			expect(store.keyed.users('alice')?.online).toBe(false);
+			expect(store.users.alice?.online).toBe(false);
+		});
+
+		it('should maintain proxy identity for field access', () => {
+			const observableStore = createObservableStore({
+				users: {
+					alice: { name: 'Alice' }
+				} as Record<string, { name: string }>
+			});
+			const store = useSvelteReactivity(observableStore);
+
+			// Same proxy instance should be returned
+			const users1 = store.users;
+			const users2 = store.users;
+			expect(users1).toBe(users2);
+		});
+
+		it('should pass through array length property', () => {
+			const observableStore = createObservableStore({
+				items: ['a', 'b', 'c']
+			});
+			const store = useSvelteReactivity(observableStore);
+
+			expect(store.items.length).toBe(3);
+		});
+
+		it('should allow iteration with for...of', () => {
+			const observableStore = createObservableStore({
+				items: ['a', 'b', 'c']
+			});
+			const store = useSvelteReactivity(observableStore);
+
+			const result: string[] = [];
+			for (const item of store.items) {
+				result.push(item);
+			}
+			expect(result).toEqual(['a', 'b', 'c']);
+		});
+
+		it('should allow array methods like map', () => {
+			const observableStore = createObservableStore({
+				items: [1, 2, 3]
+			});
+			const store = useSvelteReactivity(observableStore);
+
+			const doubled = store.items.map((x: number) => x * 2);
+			expect(doubled).toEqual([2, 4, 6]);
+		});
+
+		it('should allow Object.keys on proxied objects', () => {
+			const observableStore = createObservableStore({
+				users: {
+					alice: { name: 'Alice' },
+					bob: { name: 'Bob' }
+				} as Record<string, { name: string }>
+			});
+			const store = useSvelteReactivity(observableStore);
+
+			const keys = Object.keys(store.users);
+			expect(keys).toContain('alice');
+			expect(keys).toContain('bob');
+		});
+
+		it('should handle undefined nested values gracefully', () => {
+			const observableStore = createObservableStore({
+				users: {} as Record<string, { name: string }>
+			});
+			const store = useSvelteReactivity(observableStore);
+
+			// Accessing non-existent key returns undefined
+			expect(store.users.unknown).toBeUndefined();
+		});
+
+		it('should handle newly added keys after update', () => {
+			const observableStore = createObservableStore({
+				users: {} as Record<string, { name: string }>
+			});
+			const store = useSvelteReactivity(observableStore);
+
+			// Initially undefined
+			expect(store.users.alice).toBeUndefined();
+
+			// Add the key
+			store.update((state) => {
+				state.users.alice = { name: 'Alice' };
+			});
+
+			// Now should have the value
+			expect(store.users.alice?.name).toBe('Alice');
 		});
 	});
 
@@ -219,7 +324,7 @@ describe('useSvelteReactivity', () => {
 			expect(items).toEqual([]);
 		});
 
-		it('should maintain type safety for keyed access', () => {
+		it('should maintain type safety for nested access', () => {
 			type State = {
 				users: Record<string, { name: string }>;
 				items: number[];
@@ -231,12 +336,12 @@ describe('useSvelteReactivity', () => {
 			});
 			const store = useSvelteReactivity(observableStore);
 
-			// Record keyed access returns value or undefined
-			const john: { name: string } | undefined = store.keyed.users('john');
+			// Record property access
+			const john = store.users.john;
 			expect(john?.name).toBe('John');
 
-			// Array keyed access returns element type or undefined
-			const item: number | undefined = store.keyed.items(0);
+			// Array index access
+			const item = store.items[0];
 			expect(item).toBe(1);
 		});
 	});

@@ -1002,6 +1002,136 @@ describe('ObservableStore', () => {
 
 			// 	expect(callback).toHaveBeenCalledTimes(1);
 			// });
+
+			describe('field replacement with keyed listeners', () => {
+				it('emits keyed events when field is replaced', () => {
+					type State = {user: {name: string; age: number}};
+					const store = createObservableStore<State>({
+						user: {name: 'John', age: 30},
+					});
+
+					const callback = vi.fn();
+					store.onKeyed('user:updated', 'name', callback);
+
+					store.update((s) => {
+						s.user = {name: 'Bob', age: 25}; // Full replacement
+					});
+
+					expect(callback).toHaveBeenCalledTimes(1);
+					expect(callback).toHaveBeenCalledWith([
+						{op: 'replace', path: ['user'], value: {name: 'Bob', age: 25}},
+					]);
+				});
+
+				it('emits to multiple keyed listeners on field replacement', () => {
+					type State = {user: {name: string; age: number}};
+					const store = createObservableStore<State>({
+						user: {name: 'John', age: 30},
+					});
+
+					const nameCallback = vi.fn();
+					const ageCallback = vi.fn();
+					store.onKeyed('user:updated', 'name', nameCallback);
+					store.onKeyed('user:updated', 'age', ageCallback);
+
+					store.update((s) => {
+						s.user = {name: 'Bob', age: 25};
+					});
+
+					expect(nameCallback).toHaveBeenCalledTimes(1);
+					expect(ageCallback).toHaveBeenCalledTimes(1);
+				});
+
+				it('emits keyed events for both replaced field and nested change in same update', () => {
+					type State = {
+						users: Record<string, {name: string}>;
+						settings: {theme: string};
+					};
+					const store = createObservableStore<State>({
+						users: {'user-1': {name: 'John'}},
+						settings: {theme: 'dark'},
+					});
+
+					const usersCallback = vi.fn();
+					const settingsCallback = vi.fn();
+					store.onKeyed('users:updated', 'user-1', usersCallback);
+					store.onKeyed('settings:updated', 'theme', settingsCallback);
+
+					store.update((s) => {
+						s.users = {'user-1': {name: 'Jane'}, 'user-2': {name: 'Bob'}}; // Full replacement
+						s.settings.theme = 'light'; // Nested change
+					});
+
+					expect(usersCallback).toHaveBeenCalledTimes(1);
+					expect(settingsCallback).toHaveBeenCalledTimes(1);
+				});
+
+				it('emits keyed events for Record field when replaced', () => {
+					type State = {users: Record<string, {name: string}>};
+					const store = createObservableStore<State>({
+						users: {
+							'user-1': {name: 'John'},
+							'user-2': {name: 'Jane'},
+						},
+					});
+
+					const callback1 = vi.fn();
+					const callback2 = vi.fn();
+					const callback3 = vi.fn();
+					store.onKeyed('users:updated', 'user-1', callback1);
+					store.onKeyed('users:updated', 'user-2', callback2);
+					store.onKeyed('users:updated', 'user-3', callback3); // Not in original, but subscribed
+
+					store.update((s) => {
+						s.users = {'user-3': {name: 'Bob'}}; // Full replacement with different keys
+					});
+
+					// All registered keyed listeners should fire on full replacement
+					expect(callback1).toHaveBeenCalledTimes(1);
+					expect(callback2).toHaveBeenCalledTimes(1);
+					expect(callback3).toHaveBeenCalledTimes(1);
+				});
+
+				it('emits keyed events for array field when replaced', () => {
+					type State = {todos: Array<{text: string; done: boolean}>};
+					const store = createObservableStore<State>({
+						todos: [
+							{text: 'Task 1', done: false},
+							{text: 'Task 2', done: false},
+						],
+					});
+
+					const callback0 = vi.fn();
+					const callback1 = vi.fn();
+					store.onKeyed('todos:updated', 0, callback0);
+					store.onKeyed('todos:updated', 1, callback1);
+
+					store.update((s) => {
+						s.todos = [{text: 'New Task', done: true}]; // Full replacement
+					});
+
+					expect(callback0).toHaveBeenCalledTimes(1);
+					expect(callback1).toHaveBeenCalledTimes(1);
+				});
+
+				it('does not double-emit for keys that are both registered and in patches', () => {
+					type State = {users: Record<string, {name: string}>};
+					const store = createObservableStore<State>({
+						users: {'user-1': {name: 'John'}},
+					});
+
+					const callback = vi.fn();
+					store.onKeyed('users:updated', 'user-1', callback);
+
+					// This update will replace the users field AND user-1 is a key in the patch
+					// We use a Set for changedKeys, so it should only fire once
+					store.update((s) => {
+						s.users = {'user-1': {name: 'Bob'}};
+					});
+
+					expect(callback).toHaveBeenCalledTimes(1);
+				});
+			});
 		});
 	});
 
