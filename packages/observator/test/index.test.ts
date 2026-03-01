@@ -3304,5 +3304,270 @@ describe('ObservableStore', () => {
 				expect(store.keyedSubscriptions.items).toBeDefined();
 			});
 		});
+
+		describe('getItemId edge cases', () => {
+			it('should NOT emit keyed event when getItemId returns undefined', () => {
+				type State = {items: Array<{id?: string; value: number}>};
+
+				const store = createObservableStore<State>(
+					{items: [{value: 1}, {id: 'b', value: 2}]}, // First item has no id
+					{getItemId: {items: (item) => item.id}}, // Returns undefined for first item
+				);
+
+				const wildcardCallback = vi.fn();
+				store.onKeyed('items:updated', '*', wildcardCallback);
+
+				// Update item without ID
+				store.update((s) => {
+					s.items[0].value = 100;
+				});
+
+				// No keyed event should be emitted for item without ID
+				expect(wildcardCallback).not.toHaveBeenCalled();
+			});
+
+			it('should NOT emit keyed event when getItemId returns null', () => {
+				type State = {items: Array<{id: string | null; value: number}>};
+
+				const store = createObservableStore<State>(
+					{items: [{id: null, value: 1}, {id: 'b', value: 2}]}, // First item has null id
+					{getItemId: {items: (item) => item.id}}, // Returns null for first item
+				);
+
+				const wildcardCallback = vi.fn();
+				store.onKeyed('items:updated', '*', wildcardCallback);
+
+				// Update item with null ID
+				store.update((s) => {
+					s.items[0].value = 100;
+				});
+
+				// No keyed event should be emitted for item with null ID
+				expect(wildcardCallback).not.toHaveBeenCalled();
+			});
+
+			it('should emit keyed event only for items with valid IDs in mixed array', () => {
+				type State = {items: Array<{id?: string; value: number}>};
+
+				const store = createObservableStore<State>(
+					{items: [{value: 1}, {id: 'b', value: 2}]}, // Mixed: one without ID, one with ID
+					{getItemId: {items: (item) => item.id}},
+				);
+
+				const callbackB = vi.fn();
+				const wildcardCallback = vi.fn();
+				store.onKeyed('items:updated', 'b', callbackB);
+				store.onKeyed('items:updated', '*', wildcardCallback);
+
+				// Update item with valid ID
+				store.update((s) => {
+					s.items[1].value = 200;
+				});
+
+				// Keyed events should be emitted for item with valid ID
+				expect(callbackB).toHaveBeenCalledTimes(1);
+				expect(wildcardCallback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should still emit field-level event even when item has no valid ID', () => {
+				type State = {items: Array<{id?: string; value: number}>};
+
+				const store = createObservableStore<State>(
+					{items: [{value: 1}]}, // Item without ID
+					{getItemId: {items: (item) => item.id}},
+				);
+
+				const fieldCallback = vi.fn();
+				store.on('items:updated', fieldCallback);
+
+				// Update item without ID
+				store.update((s) => {
+					s.items[0].value = 100;
+				});
+
+				// Field-level event should still fire
+				expect(fieldCallback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle pushing item without ID field', () => {
+				type State = {items: Array<{id?: string; value: number}>};
+
+				const store = createObservableStore<State>(
+					{items: [{id: 'a', value: 1}]},
+					{getItemId: {items: (item) => item.id}},
+				);
+
+				const wildcardCallback = vi.fn();
+				const fieldCallback = vi.fn();
+				store.onKeyed('items:updated', '*', wildcardCallback);
+				store.on('items:updated', fieldCallback);
+
+				// Push item without ID
+				store.update((s) => {
+					s.items.push({value: 2}); // No id field
+				});
+
+				// Field-level event should fire
+				expect(fieldCallback).toHaveBeenCalledTimes(1);
+				// No keyed event since the new item has no ID
+				expect(wildcardCallback).not.toHaveBeenCalled();
+			});
+
+			it('should handle getItemId that throws an error', () => {
+				type State = {items: Array<{id: string; value: number}>};
+
+				const store = createObservableStore<State>(
+					{items: [{id: 'a', value: 1}]},
+					{
+						getItemId: {
+							items: (item) => {
+								if (item.value === 100) {
+									throw new Error('Test error');
+								}
+								return item.id;
+							},
+						},
+					},
+				);
+
+				const wildcardCallback = vi.fn();
+				store.onKeyed('items:updated', '*', wildcardCallback);
+
+				// This should throw because getItemId throws
+				expect(() => {
+					store.update((s) => {
+						s.items[0].value = 100;
+					});
+				}).toThrow('Test error');
+			});
+
+			it('should support nested getItemId config for nested arrays', () => {
+				type State = {
+					users: Array<{
+						id: string;
+						posts: Array<{postId: string; title: string}>;
+					}>;
+				};
+
+				const store = createObservableStore<State>(
+					{
+						users: [
+							{
+								id: 'user1',
+								posts: [{postId: 'post1', title: 'Hello'}],
+							},
+						],
+					},
+					{
+						getItemId: {
+							users: {
+								posts: (post) => post.postId,
+							},
+						},
+					},
+				);
+
+				const fieldCallback = vi.fn();
+				store.on('users:updated', fieldCallback);
+
+				// Update nested post
+				store.update((s) => {
+					s.users[0].posts[0].title = 'Updated';
+				});
+
+				// Field-level event should fire
+				expect(fieldCallback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle empty array with getItemId configured', () => {
+				type State = {items: Array<{id: string; value: number}>};
+
+				const store = createObservableStore<State>(
+					{items: []},
+					{getItemId: {items: (item) => item.id}},
+				);
+
+				const wildcardCallback = vi.fn();
+				const fieldCallback = vi.fn();
+				store.onKeyed('items:updated', '*', wildcardCallback);
+				store.on('items:updated', fieldCallback);
+
+				// Push first item
+				store.update((s) => {
+					s.items.push({id: 'a', value: 1});
+				});
+
+				// Field-level event should fire
+				expect(fieldCallback).toHaveBeenCalledTimes(1);
+				// Push doesn't include id in patch (it's adding a NEW item, not modifying existing)
+				// so no keyed event is emitted
+				expect(wildcardCallback).not.toHaveBeenCalled();
+			});
+
+			it('should handle updating newly pushed item with valid ID', () => {
+				type State = {items: Array<{id: string; value: number}>};
+
+				const store = createObservableStore<State>(
+					{items: []},
+					{getItemId: {items: (item) => item.id}},
+				);
+
+				// First push an item
+				store.update((s) => {
+					s.items.push({id: 'a', value: 1});
+				});
+
+				const callbackA = vi.fn();
+				store.onKeyed('items:updated', 'a', callbackA);
+
+				// Now update the item
+				store.update((s) => {
+					s.items[0].value = 100;
+				});
+
+				// Keyed event should fire for the update
+				expect(callbackA).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle item with ID of 0 (falsy but valid)', () => {
+				type State = {items: Array<{id: number; value: string}>};
+
+				const store = createObservableStore<State>(
+					{items: [{id: 0, value: 'first'}, {id: 1, value: 'second'}]},
+					{getItemId: {items: (item) => item.id}},
+				);
+
+				const callback0 = vi.fn();
+				store.onKeyed('items:updated', 0, callback0);
+
+				// Update item with ID 0
+				store.update((s) => {
+					s.items[0].value = 'updated';
+				});
+
+				// Keyed event should fire for ID 0
+				expect(callback0).toHaveBeenCalledTimes(1);
+			});
+
+			it('should handle item with ID of empty string (falsy but valid)', () => {
+				type State = {items: Array<{id: string; value: number}>};
+
+				const store = createObservableStore<State>(
+					{items: [{id: '', value: 1}, {id: 'b', value: 2}]},
+					{getItemId: {items: (item) => item.id}},
+				);
+
+				const callbackEmpty = vi.fn();
+				store.onKeyed('items:updated', '', callbackEmpty);
+
+				// Update item with empty string ID
+				store.update((s) => {
+					s.items[0].value = 100;
+				});
+
+				// Keyed event should fire for empty string ID
+				expect(callbackEmpty).toHaveBeenCalledTimes(1);
+			});
+		});
 	});
 });
