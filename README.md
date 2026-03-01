@@ -1,13 +1,13 @@
 # observator
 
-A type-safe store that emits events for each top-level field change. Uses [patch-recorder](https://github.com/wighawag/patch-recorder) by default for mutative updates with JSON Patch generation, but you can use any compatible library (e.g., mutative or immer). Uses [radiate](https://github.com/wighawag/radiate) for type-safe event emission.
+A type-safe store that emits events for each top-level field change. Uses [patch-recorder](https://github.com/wighawag/patch-recorder) for mutative updates with JSON Patch generation. Uses [radiate](https://github.com/wighawag/radiate) for type-safe event emission.
 
 ## Features
 
 - 🔒 **Type-safe event names** - Only valid field names can be used for updates and subscriptions
 - 📝 **Patches included** - Event callbacks receive [JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902) arrays
-- 🎯 **Patch mechanism agnostic** - Use any patch generation library (patch-recorder, mutative, immer, etc.)
 - 🎯 **Fine-grained subscriptions** - Subscribe to specific keys within Record/Map fields using keyed events
+- 🆔 **ID-based array tracking** - Use `getItemId` for stable identity-based subscriptions to array items
 - 💡 **Value-based subscriptions** - Use the convenient `subscribe` API to receive current values immediately and on every change
 - 🎯 **Minimal events** - Events are emitted only for the specific field being updated
 - 📦 **Minimal dependencies** - Only depends on `patch-recorder` and `radiate`
@@ -21,16 +21,6 @@ npm install observator
 pnpm add observator
 # or
 yarn add observator
-```
-
-By default, `observator` uses [patch-recorder](https://github.com/wighawag/patch-recorder) for patch generation. To use a different library, install it as well:
-
-```bash
-# Using mutative
-npm install mutative
-
-# Using immer
-npm install immer
 ```
 ## Usage
 
@@ -436,32 +426,191 @@ store.update((state) => {
 unsubscribe();
 ```
 
-#### Array Index Subscription
+#### Arrays Without `getItemId`
 
-Subscribe to specific array indices:
+**⚠️ Important:** Arrays without `getItemId` configured do **NOT** support keyed events. Any `onKeyed` subscriptions for such arrays will simply never fire.
+
+For arrays, you must choose one of these approaches:
+1. **ID-based subscriptions** with `getItemId` option (see [ID-Based Array Subscriptions](#id-based-array-subscriptions-getitemid))
+2. **Field-level subscriptions** (`items:updated`) for the whole array
+
+```typescript
+// Without getItemId, keyed events for arrays are disabled:
+const store = createObservableStore<{ items: number[] }>({ items: [1, 2, 3] });
+
+// ❌ This callback will NEVER fire for arrays without getItemId
+store.onKeyed('items:updated', 0, (patches) => {
+  console.log('This will never be called!');
+});
+
+// ✅ Use field-level subscription instead
+store.on('items:updated', (patches) => {
+  console.log('Array changed:', patches);
+});
+
+// ✅ Or configure getItemId for ID-based subscriptions
+// (See ID-Based Array Subscriptions section below)
+```
+
+### ID-Based Array Subscriptions (`getItemId`)
+
+For arrays where items have unique identifiers, use the `getItemId` option to enable stable, identity-based keyed subscriptions. This is the recommended approach for arrays.
 
 ```typescript
 type State = {
   todos: Array<{ id: number; text: string; done: boolean }>;
 };
 
-const store = createObservableStore<State>({
-  todos: [
-    { id: 1, text: 'Task 1', done: false },
-    { id: 2, text: 'Task 2', done: false }
-  ]
+const store = createObservableStore<State>(
+  {
+    todos: [
+      { id: 1, text: 'Task 1', done: false },
+      { id: 2, text: 'Task 2', done: false }
+    ]
+  },
+  {
+    getItemId: {
+      todos: (item) => item.id  // Extract unique ID from each item
+    }
+  }
+);
+
+// Subscribe to todo with ID 1 (not index 0!)
+store.onKeyed('todos:updated', 1, (patches) => {
+  console.log('Todo with ID 1 changed:', patches);
 });
 
-// Subscribe to first todo changes
-store.onKeyed('todos:updated', 0, (patches) => {
-  console.log('First todo changed:', patches);
-});
-
+// This works even after reordering!
 store.update((state) => {
-  state.todos[0].done = true;
+  // Move todo 2 to the front
+  const todo2 = state.todos.splice(1, 1)[0];
+  state.todos.unshift(todo2);
 });
-// Only the first todo callback fires
+
+// Now update todo 1 (which is now at index 1)
+store.update((state) => {
+  state.todos[1].done = true;  // This is still todo with ID 1
+});
+// The callback fires correctly because we subscribed to ID 1, not index 1
 ```
+
+#### Important Limitations of `getItemId`
+
+**The `getItemId` feature only tracks property updates within items.** The following operations do **NOT** emit keyed events:
+
+1. **Item Removal** - When an item is removed (via `splice`, `pop`, `shift`, `filter`, etc.), no keyed event is emitted for the removed item's ID:
+
+```typescript
+const store = createObservableStore<State>(
+  { items: [{ id: 'a', value: 1 }, { id: 'b', value: 2 }] },
+  { getItemId: { items: (item) => item.id } }
+);
+
+const callback = vi.fn();
+store.onKeyed('items:updated', 'a', callback);
+
+// ⚠️ No keyed event fires when 'a' is removed!
+store.update((state) => {
+  state.items.shift();  // Removes item with id 'a'
+});
+
+// callback is NOT called - use field-level subscription instead:
+store.on('items:updated', (patches) => {
+  // This fires for any array change including removals
+});
+```
+
+2. **Full Item Replacement** - When an entire item is replaced at an index, no keyed event is emitted:
+
+```typescript
+// ⚠️ No keyed event for old or new item!
+store.update((state) => {
+  state.items[0] = { id: 'c', value: 100 };  // Replace entire item
+});
+// Neither 'a' nor 'c' subscribers are notified
+```
+
+3. **Array Field Replacement** - When the entire array is replaced:
+
+```typescript
+// ⚠️ No keyed events for any items!
+store.update((state) => {
+  state.items = [{ id: 'd', value: 200 }];  // Replace entire array
+});
+```
+
+**Why?** The underlying `patch-recorder` library only populates `patch.id` when a property of an existing item is updated. Removals and full replacements generate patches at the array index level, not the item property level.
+
+#### When to Use `getItemId`
+
+| Use Case | Recommendation |
+|----------|----------------|
+| Track item property updates | ✅ Use `getItemId` |
+| Track item additions | ❌ Use field-level subscription |
+| Track item removals | ❌ Use field-level subscription |
+| Track item replacements | ❌ Use field-level subscription |
+| Track reordering | ❌ Use field-level subscription |
+
+#### Combining Both Patterns
+
+For complete array tracking, combine both approaches:
+
+```typescript
+// Field-level for structural changes (add/remove/reorder)
+store.on('items:updated', (patches) => {
+  // Fires for ALL array changes
+  console.log('Array structure changed');
+});
+
+// ID-based for specific item property updates
+store.onKeyed('items:updated', 'item-123', (patches) => {
+  // Fires only when item-123's properties are updated
+  console.log('Item 123 properties changed');
+});
+```
+
+#### `getItemId` Configuration
+
+The `getItemId` option accepts a configuration object mapping field names to ID extractor functions:
+
+```typescript
+type GetItemIdFunction = (value: any) => string | number | undefined | null;
+
+type GetItemIdConfig = {
+  [fieldName: string]: GetItemIdFunction | GetItemIdConfig;  // Supports nesting
+};
+```
+
+**Examples:**
+
+```typescript
+// Simple configuration
+const store = createObservableStore<State>(
+  initialState,
+  {
+    getItemId: {
+      todos: (todo) => todo.id,
+      users: (user) => user.visitorId,
+    }
+  }
+);
+
+// Nested arrays (e.g., users[].posts[])
+const store = createObservableStore<State>(
+  initialState,
+  {
+    getItemId: {
+      users: {
+        posts: (post) => post.postId  // Nested getItemId for posts within users
+      }
+    }
+  }
+);
+```
+
+**Return values:**
+- Return `string` or `number` for a valid ID
+- Return `undefined` or `null` to skip keyed event emission for that item
 
 #### Single Emission
 
@@ -569,7 +718,7 @@ console.log(store.get('counter')); // Still 0
 
 ### `createObservableStore<T>(state: T, options?: ObservableStoreOptions): ObservableStore<T>`
 
-Creates a new ObservableStore instance with the given initial state. Uses `patch-recorder` by default, but you can pass a custom create function.
+Creates a new ObservableStore instance with the given initial state. Uses [patch-recorder](https://github.com/wighawag/patch-recorder) for patch generation.
 
 **Type Parameter:**
 - `T` - The state type, must be `Record<string, unknown> & NonPrimitive`
@@ -577,12 +726,12 @@ Creates a new ObservableStore instance with the given initial state. Uses `patch
 **Parameters:**
 - `state` - Initial state object
 - `options` - Optional configuration object
-  - `createFunction?: CreateFunction` - Custom create function for patch generation
+  - `getItemId?: GetItemIdConfig` - Configuration for ID-based array keyed events (see [ID-Based Array Subscriptions](#id-based-array-subscriptions-getitemid))
 
 **Returns:**
 - A new `ObservableStore<T>` instance
 
-**Example (default usage):**
+**Example (basic usage):**
 ```typescript
 import {createObservableStore} from 'observator';
 
@@ -592,18 +741,32 @@ const store = createObservableStore({
 });
 ```
 
-**Example (with custom create function):**
+**Example (with getItemId for arrays):**
 ```typescript
 import {createObservableStore} from 'observator';
-import {create} from 'mutative';
 
-const store = createObservableStore(
+type State = {
+  todos: Array<{ id: number; text: string; done: boolean }>;
+};
+
+const store = createObservableStore<State>(
   {
-    user: { name: 'John' },
-    counter: { value: 0 }
+    todos: [
+      { id: 1, text: 'Task 1', done: false },
+      { id: 2, text: 'Task 2', done: false }
+    ]
   },
-  {createFunction: (state, mutate) => create(state, mutate, {enablePatches: true})},
+  {
+    getItemId: {
+      todos: (todo) => todo.id  // Use item's id property for keyed events
+    }
+  }
 );
+
+// Now you can subscribe using item IDs instead of indices
+store.onKeyed('todos:updated', 1, (patches) => {
+  console.log('Todo with ID 1 changed:', patches);
+});
 ```
 
 
@@ -1087,60 +1250,30 @@ store.update('users', (state) => {
 
 ## Working with Primitives
 
-The top-level state must be a non-primitive object or array (enforced by TypeScript), but field values can be primitives when using patch-recorder (the default). For maximum compatibility across all patch generation libraries (including mutative/immer), wrap primitives in objects:
+The top-level state must be a non-primitive object or array (enforced by TypeScript), but field values can be primitives:
 
 ```typescript
-// ✅ Works with patch-recorder (default)
-type State1 = {
+// ✅ Works with observator
+type State = {
   count: number;  // Primitive at field level works
   name: string;
   flag: boolean;
 };
 
-const store1 = createObservableStore<State1>({
+const store = createObservableStore<State>({
   count: 0,
   name: 'John',
   flag: false
 });
 
-store1.update((state) => {
+store.update((state) => {
   state.count += 1;
-});
-
-// For maximum compatibility across all libraries (mutative, immer)
-type State2 = {
-  count: { value: number };  // Wrapped primitive
-  name: { value: string };
-  flag: { value: boolean };
-};
-
-// You can create a utility type for consistency
-type PrimitiveField<T> = { value: T };
-
-type BetterState = {
-  count: PrimitiveField<number>;
-  name: PrimitiveField<string>;
-  flag: PrimitiveField<boolean>;
-};
-
-const store2 = createObservableStore<BetterState>({
-  count: { value: 0 },
-  name: { value: 'John' },
-  flag: { value: false }
-});
-
-store2.update((state) => {
-  state.count.value += 1;
 });
 ```
 
 ## Understanding Patches
 
-Patches follow the [JSON Patch (RFC 6902)](https://datatracker.ietf.org/doc/html/rfc6902) format. The exact patch format depends on the patch generation library you use:
-
-- **patch-recorder (default)**: Generates patches with minimal overhead while keeping references
-- **mutative**: Generates high-performance JSON patches with array optimizations
-- **immer**: Generates standard JSON patches
+Patches follow the [JSON Patch (RFC 6902)](https://datatracker.ietf.org/doc/html/rfc6902) format. The [patch-recorder](https://github.com/wighawag/patch-recorder) library generates patches with minimal overhead while keeping object references.
 
 ```typescript
 store.on('user:updated', (patches) => {
