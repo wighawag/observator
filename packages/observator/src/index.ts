@@ -124,7 +124,7 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 		this.state = newState;
 
 		// Group patches by top-level field key
-		const {all, topLevel, replacedFields} = this.groupPatchesByField(patches);
+		const {all, topLevel, replacedFields, lengthReductions} = this.groupPatchesByField(patches);
 
 		// Emit wildcard event with all patches
 		this.emitter.emit('*', patches);
@@ -145,6 +145,14 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 					const registeredKeys = this.emitter.getKeyedListenerKeys(eventName);
 					for (const key of registeredKeys) {
 						changedKeys.add(key as Key);
+					}
+				}
+
+				// Add removed array indices from length reductions
+				const reduction = lengthReductions.get(fieldKey);
+				if (reduction) {
+					for (let i = reduction.newLength; i < reduction.oldLength; i++) {
+						changedKeys.add(i);
 					}
 				}
 
@@ -492,10 +500,12 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 		topLevel: Map<string, Patches>;
 		all: Map<string, Patches>;
 		replacedFields: Set<string>;
+		lengthReductions: Map<string, {oldLength: number; newLength: number}>;
 	} {
 		const topLevel: Map<string, Patches> = new Map();
 		const all: Map<string, Patches> = new Map();
 		const replacedFields = new Set<string>();
+		const lengthReductions = new Map<string, {oldLength: number; newLength: number}>();
 
 		for (const patch of patches) {
 			if (patch.path.length === 0) {
@@ -509,6 +519,21 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 			// Track field replacements (patches with path.length === 1)
 			if (patch.path.length === 1) {
 				replacedFields.add(fieldKey);
+			}
+
+			// Detect array length reductions for keyed events
+			if (
+				patch.path.length === 2 &&
+				patch.path[1] === 'length' &&
+				patch.op === 'replace' &&
+				typeof patch.oldValue === 'number' &&
+				typeof patch.value === 'number' &&
+				patch.value < patch.oldValue
+			) {
+				lengthReductions.set(fieldKey, {
+					oldLength: patch.oldValue,
+					newLength: patch.value,
+				});
 			}
 
 			if (patch.path.length === 1 || patch.path.length === 2) {
@@ -531,7 +556,7 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 			allGroup.push(patch);
 		}
 
-		return {topLevel, all, replacedFields};
+		return {topLevel, all, replacedFields, lengthReductions};
 	}
 
 	private collectPatchesForSpecificListeners(

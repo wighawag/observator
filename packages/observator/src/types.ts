@@ -119,6 +119,11 @@ export type Patch = {
 	op: PatchOp;
 	value?: any;
 	/**
+	 * Optional previous value for replace operations.
+	 * Populated by patch-recorder for array length changes.
+	 */
+	oldValue?: any;
+	/**
 	 * Optional ID of the item being removed or replaced.
 	 * Populated when getItemId option is configured for the item's parent path.
 	 */

@@ -2897,5 +2897,187 @@ describe('ObservableStore', () => {
 				// Field-level subscription is the reliable pattern for arrays
 			});
 		});
+
+		describe('Array removal keyed events (with patch-recorder oldValue support)', () => {
+			it('should emit keyed events for removed indices on pop', () => {
+				type State = {
+					items: Array<{id: number}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [{id: 1}, {id: 2}, {id: 3}],
+				});
+
+				const callback2 = vi.fn();
+				store.onKeyed('items:updated', 2, callback2);
+
+				store.update((s) => s.items.pop());
+
+				// Index 2 is removed, keyed event should fire
+				expect(callback2).toHaveBeenCalledTimes(1);
+			});
+
+			it('should emit keyed events for all removed indices on bulk removal', () => {
+				type State = {
+					items: Array<{id: number}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [{id: 1}, {id: 2}, {id: 3}, {id: 4}, {id: 5}],
+				});
+
+				const callback2 = vi.fn();
+				const callback3 = vi.fn();
+				const callback4 = vi.fn();
+
+				store.onKeyed('items:updated', 2, callback2);
+				store.onKeyed('items:updated', 3, callback3);
+				store.onKeyed('items:updated', 4, callback4);
+
+				store.update((s) => {
+					s.items.length = 2;
+				});
+
+				// All indices 2, 3, 4 are removed
+				expect(callback2).toHaveBeenCalledTimes(1);
+				expect(callback3).toHaveBeenCalledTimes(1);
+				expect(callback4).toHaveBeenCalledTimes(1);
+			});
+
+			it('should emit keyed events on shift for removed index', () => {
+				// Note: shift generates a 'remove' operation at index 0
+				// It does NOT generate patches for indices that shifted
+				type State = {
+					items: Array<{id: number}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [{id: 1}, {id: 2}, {id: 3}],
+				});
+
+				const callback0 = vi.fn();
+
+				store.onKeyed('items:updated', 0, callback0);
+
+				store.update((s) => s.items.shift());
+
+				// patch-recorder generates: { op: 'remove', path: ['items', 0] }
+				// So only index 0 receives a keyed event
+				expect(callback0).toHaveBeenCalled();
+			});
+
+			it('should emit keyed events on splice for removed indices', () => {
+				// Note: splice(1, 2) removes elements at indices 1 and 2
+				// patch-recorder generates remove operations for those exact indices
+				type State = {
+					items: Array<{id: number}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [{id: 1}, {id: 2}, {id: 3}, {id: 4}],
+				});
+
+				const callback1 = vi.fn();
+				const callback2 = vi.fn();
+
+				store.onKeyed('items:updated', 1, callback1);
+				store.onKeyed('items:updated', 2, callback2);
+
+				// Remove 2 elements starting at index 1
+				store.update((s) => s.items.splice(1, 2));
+
+				// patch-recorder generates: remove at index 2, remove at index 1
+				expect(callback1).toHaveBeenCalled();
+				expect(callback2).toHaveBeenCalled();
+			});
+
+			it('should emit keyed events on multiple pops', () => {
+				type State = {
+					items: Array<{id: number}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [{id: 1}, {id: 2}, {id: 3}, {id: 4}, {id: 5}],
+				});
+
+				const callback2 = vi.fn();
+				store.onKeyed('items:updated', 2, callback2);
+
+				// Pop 3 times
+				store.update((s) => s.items.pop()); // Removes index 4
+				store.update((s) => s.items.pop()); // Removes index 3
+				store.update((s) => s.items.pop()); // Removes index 2
+
+				// Index 2 listener should fire when index 2 is actually removed
+				expect(callback2).toHaveBeenCalledTimes(1);
+			});
+
+			it('should not emit keyed events when no keyed listeners exist (performance)', () => {
+				type State = {
+					items: Array<{id: number}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [{id: 1}, {id: 2}, {id: 3}],
+				});
+
+				const fieldCallback = vi.fn();
+				store.on('items:updated', fieldCallback);
+
+				// No keyed listeners - should not cause any keyed event overhead
+				store.update((s) => s.items.pop());
+
+				// Only field callback fires
+				expect(fieldCallback).toHaveBeenCalledTimes(1);
+			});
+
+			it('should work with wildcard keyed listeners for removal', () => {
+				type State = {
+					items: Array<{id: number}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [{id: 1}, {id: 2}, {id: 3}],
+				});
+
+				const wildcardCallback = vi.fn();
+				store.onKeyed('items:updated', '*', wildcardCallback);
+
+				store.update((s) => s.items.pop());
+
+				// Wildcard listener should receive the removed index
+				expect(wildcardCallback).toHaveBeenCalled();
+				// The key passed should be the removed index (2)
+				const lastCall = wildcardCallback.mock.calls[wildcardCallback.mock.calls.length - 1];
+				expect(lastCall[0]).toBe(2);
+			});
+
+			it('should handle removing all elements', () => {
+				type State = {
+					items: Array<{id: number}>;
+				};
+
+				const store = createObservableStore<State>({
+					items: [{id: 1}, {id: 2}, {id: 3}],
+				});
+
+				const callback0 = vi.fn();
+				const callback1 = vi.fn();
+				const callback2 = vi.fn();
+
+				store.onKeyed('items:updated', 0, callback0);
+				store.onKeyed('items:updated', 1, callback1);
+				store.onKeyed('items:updated', 2, callback2);
+
+				store.update((s) => {
+					s.items.length = 0;
+				});
+
+				// All indices should receive keyed events
+				expect(callback0).toHaveBeenCalledTimes(1);
+				expect(callback1).toHaveBeenCalledTimes(1);
+				expect(callback2).toHaveBeenCalledTimes(1);
+			});
+		});
 	});
 });
