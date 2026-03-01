@@ -1,6 +1,18 @@
 import { createSubscriber } from 'svelte/reactivity';
 import type { ObservableStore } from 'observator';
-import type { NonPrimitive, Patches, Key } from 'observator';
+import type { NonPrimitive, Patches, Key, GetItemIdConfig } from 'observator';
+
+/**
+ * Options for useSvelteReactivity
+ */
+export type ReactiveStoreOptions = {
+	/**
+	 * Configuration for extracting item IDs from array elements.
+	 * When configured, array keyed subscriptions use item IDs instead of indices.
+	 * Must match the getItemId configuration used when creating the ObservableStore.
+	 */
+	getItemId?: GetItemIdConfig;
+};
 
 /**
  * Built-in properties that should not create subscriptions
@@ -58,9 +70,33 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 	private readonly fieldProxyCache: Map<string, object> = new Map();
 	private readonly propertyProxyCache: Map<string, object> = new Map();
 
-	constructor(private readonly observableStore: ObservableStore<T>) {
+	// Configuration for ID-based array subscriptions
+	private readonly getItemIdConfig?: GetItemIdConfig;
+	// Track which fields are arrays
+	private readonly arrayFields: Set<string>;
+
+	constructor(
+		private readonly observableStore: ObservableStore<T>,
+		options?: ReactiveStoreOptions
+	) {
+		this.getItemIdConfig = options?.getItemId;
+		this.arrayFields = this.detectArrayFields();
 		// Create reactive getters for each field
 		this.createFieldGetters();
+	}
+
+	/**
+	 * Detect which fields in the state are arrays
+	 */
+	private detectArrayFields(): Set<string> {
+		const state = this.observableStore.getState();
+		const fields = new Set<string>();
+		for (const key of Object.keys(state)) {
+			if (Array.isArray(state[key as keyof T])) {
+				fields.add(key);
+			}
+		}
+		return fields;
 	}
 
 	/**
@@ -107,6 +143,7 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 	/**
 	 * Create a FieldProxy for object/array field values.
 	 * The proxy intercepts property access to create keyed subscriptions.
+	 * For arrays with getItemId configured, subscriptions use item IDs instead of indices.
 	 */
 	private createFieldProxy<V extends object>(field: string, target: V): V {
 		const cacheKey = field;
@@ -116,6 +153,9 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 
 		const store = this;
 		const isArray = Array.isArray(target);
+		const getItemIdFn = isArray ? this.getItemIdConfig?.[field] : undefined;
+		const hasGetItemId = typeof getItemIdFn === 'function';
+
 		const proxy = new Proxy(target, {
 			get(target: V, prop: string | symbol, receiver: any): any {
 				// Pass through symbols (iterators, etc.)
@@ -130,19 +170,35 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 
 				const value = Reflect.get(target, prop, receiver);
 
-				// For arrays, convert numeric string keys to numbers
-				// Patches from patch-recorder use numeric indices, not strings
-				let key: string | number = prop;
+				// Handle array access
 				if (isArray && /^\d+$/.test(prop)) {
-					key = Number(prop);
+					// For arrays with getItemId, use item ID for subscription
+					if (hasGetItemId && value !== undefined && value !== null) {
+						const itemId = (getItemIdFn as (value: any) => string | number | undefined | null)(value);
+						if (itemId !== undefined && itemId !== null) {
+							// Use item ID for keyed subscription
+							store.ensureKeyedSubscription(field, itemId);
+							// Wrap return value in PropertyProxy using itemId as key
+							if (typeof value === 'object') {
+								return store.createPropertyProxy(field, itemId, value as object);
+							}
+							return value;
+						}
+					}
+					// No getItemId or no ID - use field-level subscription for arrays
+					// This handles: arrays without getItemId, undefined values (out of bounds), null values
+					store.getOrCreateFieldSubscriber(field as keyof T)();
+					if (value !== null && typeof value === 'object') {
+						return value;
+					}
+					return value;
 				}
 
-				// Create keyed subscription for this property access
-				store.ensureKeyedSubscription(field, key);
-
+				// Non-array: use property key
+				store.ensureKeyedSubscription(field, prop);
 				// If value is an object, wrap in PropertyProxy for deeper access
 				if (value !== null && typeof value === 'object') {
-					return store.createPropertyProxy(field, key, value as object);
+					return store.createPropertyProxy(field, prop, value as object);
 				}
 
 				return value;
@@ -327,7 +383,12 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
  * - `store.users.alice` creates a keyed subscription for 'alice'
  * - `store.user.name` creates a keyed subscription for 'name'
  *
+ * For arrays with `getItemId` configured, keyed subscriptions use item IDs
+ * instead of array indices, providing stable identity-based subscriptions
+ * that survive reordering, insertions, and deletions.
+ *
  * @param observableStore - An existing ObservableStore instance
+ * @param options - Optional configuration including getItemId for ID-based array subscriptions
  * @returns A ReactiveStore with reactive field getters
  *
  * @example
@@ -339,26 +400,35 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
  *   count: number;
  *   user: { name: string; age: number };
  *   users: Record<string, { name: string; online: boolean }>;
+ *   todos: Array<{ id: string; text: string; done: boolean }>;
  * };
  *
- * const observableStore = createObservableStore<State>({
- *   count: 0,
- *   user: { name: 'John', age: 30 },
- *   users: { alice: { name: 'Alice', online: true } }
- * });
+ * const observableStore = createObservableStore<State>(
+ *   {
+ *     count: 0,
+ *     user: { name: 'John', age: 30 },
+ *     users: { alice: { name: 'Alice', online: true } },
+ *     todos: [{ id: 'a', text: 'Learn Svelte', done: false }]
+ *   },
+ *   { getItemId: { todos: (t) => t.id } }
+ * );
  *
- * // Wrap with Svelte reactivity
- * const store = useSvelteReactivity(observableStore);
+ * // Wrap with Svelte reactivity (must pass same getItemId config)
+ * const store = useSvelteReactivity(observableStore, {
+ *   getItemId: { todos: (t) => t.id }
+ * });
  *
  * // In a Svelte component:
  * // {store.count} - reactive (field-level)
  * // {store.user.name} - reactive (keyed subscription on 'name')
  * // {store.users.alice?.name} - reactive (keyed subscription on 'alice')
+ * // {store.todos[0]?.text} - reactive (keyed subscription on todo ID 'a')
  * // store.update(s => { s.count += 1; }); - triggers update
  * ```
  */
 export function useSvelteReactivity<T extends Record<string, unknown> & NonPrimitive>(
-	observableStore: ObservableStore<T>
+	observableStore: ObservableStore<T>,
+	options?: ReactiveStoreOptions
 ): ReactiveStoreWithFields<T> {
-	return new ReactiveStore(observableStore) as ReactiveStoreWithFields<T>;
+	return new ReactiveStore(observableStore, options) as ReactiveStoreWithFields<T>;
 }

@@ -135,9 +135,11 @@ export type Patches = Patch[];
 export type RecordPatchesFunction = <T extends NonPrimitive>(
 	state: T,
 	mutate: (state: T) => void,
+	options?: {getItemId?: GetItemIdConfig},
 ) => Patches;
 
 export type CreateFunction = <T extends NonPrimitive>(
 	state: T,
 	mutate: (state: T) => void,
+	getItemId?: GetItemIdConfig,
 ) => [T, Patches];

@@ -322,14 +322,21 @@ describe('Svelte Reactivity', () => {
 
 		it('should only re-run effects for relevant array index updates', () => {
 			const cleanup = $effect.root(() => {
-				const observableStore = createObservableStore({
-					items: [
-						{ id: 0, text: 'First', done: false },
-						{ id: 1, text: 'Second', done: false },
-						{ id: 2, text: 'Third', done: false }
-					]
+				// With getItemId configured, array subscriptions use item IDs instead of indices
+				// This provides fine-grained reactivity where only the affected item's effects re-run
+				const observableStore = createObservableStore(
+					{
+						items: [
+							{ id: 0, text: 'First', done: false },
+							{ id: 1, text: 'Second', done: false },
+							{ id: 2, text: 'Third', done: false }
+						]
+					},
+					{ getItemId: { items: (item: { id: number }) => item.id } }
+				);
+				const store = useSvelteReactivity(observableStore, {
+					getItemId: { items: (item: { id: number }) => item.id }
 				});
-				const store = useSvelteReactivity(observableStore);
 
 				let item0Runs = 0;
 				let item1Runs = 0;
@@ -930,6 +937,191 @@ describe('Svelte Reactivity', () => {
 			});
 
 			cleanup();
+		});
+	
+		describe('ID-based array reactivity', () => {
+			it('should use item ID for keyed subscription when getItemId is configured', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [
+								{ id: 'a', text: 'First' },
+								{ id: 'b', text: 'Second' }
+							]
+						},
+						{ getItemId: { items: (item: { id: string }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id: string }) => item.id }
+					});
+	
+					const itemAValues: string[] = [];
+					const itemBValues: string[] = [];
+	
+					$effect(() => {
+						itemAValues.push(store.items[0]?.text ?? 'none');
+					});
+	
+					$effect(() => {
+						itemBValues.push(store.items[1]?.text ?? 'none');
+					});
+	
+					flushSync();
+					expect(itemAValues).toEqual(['First']);
+					expect(itemBValues).toEqual(['Second']);
+	
+					// Update item 'a' (at index 0)
+					store.update((s) => {
+						s.items[0].text = 'Updated First';
+					});
+	
+					flushSync();
+					expect(itemAValues).toEqual(['First', 'Updated First']);
+					// Item 'b' should NOT re-run because we're using ID-based subscriptions
+					expect(itemBValues).toEqual(['Second']);
+	
+					// Update item 'b' (at index 1)
+					store.update((s) => {
+						s.items[1].text = 'Updated Second';
+					});
+	
+					flushSync();
+					expect(itemAValues).toEqual(['First', 'Updated First']);
+					expect(itemBValues).toEqual(['Second', 'Updated Second']);
+				});
+	
+				cleanup();
+			});
+	
+			it('should track correct item after reordering with ID-based subscriptions', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [
+								{ id: 'a', text: 'Item A' },
+								{ id: 'b', text: 'Item B' }
+							]
+						},
+						{ getItemId: { items: (item: { id: string }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id: string }) => item.id }
+					});
+	
+					let itemAtIndex0Runs = 0;
+					let itemAtIndex1Runs = 0;
+	
+					// These effects access items by index, but subscriptions use item IDs
+					$effect(() => {
+						store.items[0]; // Will subscribe to 'a' initially
+						untrack(() => itemAtIndex0Runs++);
+					});
+	
+					$effect(() => {
+						store.items[1]; // Will subscribe to 'b' initially
+						untrack(() => itemAtIndex1Runs++);
+					});
+	
+					flushSync();
+					expect(itemAtIndex0Runs).toBe(1);
+					expect(itemAtIndex1Runs).toBe(1);
+	
+					// Swap items: now 'b' is at index 0, 'a' is at index 1
+					store.update((s) => {
+						const temp = s.items[0];
+						s.items[0] = s.items[1];
+						s.items[1] = temp;
+					});
+	
+					flushSync();
+					// Both effects may re-run due to the swap (both items were modified)
+					expect(itemAtIndex0Runs).toBeGreaterThanOrEqual(1);
+					expect(itemAtIndex1Runs).toBeGreaterThanOrEqual(1);
+	
+					// Verify the data is correct after swap
+					expect(store.getRaw('items')[0].id).toBe('b');
+					expect(store.getRaw('items')[1].id).toBe('a');
+				});
+	
+				cleanup();
+			});
+	
+			it('should use field-level subscription for arrays without getItemId', () => {
+				const cleanup = $effect.root(() => {
+					// No getItemId configured - arrays use field-level subscription
+					const observableStore = createObservableStore({
+						items: [
+							{ id: 'a', text: 'First' },
+							{ id: 'b', text: 'Second' }
+						]
+					});
+					const store = useSvelteReactivity(observableStore);
+	
+					let item0Runs = 0;
+					let item1Runs = 0;
+	
+					$effect(() => {
+						store.items[0];
+						untrack(() => item0Runs++);
+					});
+	
+					$effect(() => {
+						store.items[1];
+						untrack(() => item1Runs++);
+					});
+	
+					flushSync();
+					expect(item0Runs).toBe(1);
+					expect(item1Runs).toBe(1);
+	
+					// Update only item at index 0
+					// Without getItemId, all array-accessing effects should re-run
+					store.update((s) => {
+						s.items[0].text = 'Updated First';
+					});
+	
+					flushSync();
+					// Both effects re-run because they both use field-level subscription
+					expect(item0Runs).toBe(2);
+					expect(item1Runs).toBe(2);
+				});
+	
+				cleanup();
+			});
+	
+			it('should handle new items with ID-based subscriptions', () => {
+				const cleanup = $effect.root(() => {
+					const observableStore = createObservableStore(
+						{
+							items: [{ id: 'a', text: 'First' }]
+						},
+						{ getItemId: { items: (item: { id: string }) => item.id } }
+					);
+					const store = useSvelteReactivity(observableStore, {
+						getItemId: { items: (item: { id: string }) => item.id }
+					});
+	
+					const item1Values: string[] = [];
+	
+					$effect(() => {
+						item1Values.push(store.items[1]?.text ?? 'none');
+					});
+	
+					flushSync();
+					expect(item1Values).toEqual(['none']);
+	
+					// Push a new item
+					store.update((s) => {
+						s.items.push({ id: 'b', text: 'Second' });
+					});
+	
+					flushSync();
+					// Effect should re-run with the new value (field-level subscription for undefined -> value transition)
+					expect(item1Values[item1Values.length - 1]).toBe('Second');
+				});
+	
+				cleanup();
+			});
 		});
 	});
 });

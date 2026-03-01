@@ -2,7 +2,8 @@
 export {
 	useSvelteReactivity,
 	ReactiveStore,
-	type ReactiveStoreWithFields
+	type ReactiveStoreWithFields,
+	type ReactiveStoreOptions
 } from './store.svelte.js';
 
 // Re-export useful types from observator
@@ -14,5 +15,7 @@ export type {
 	PatchOp,
 	NonPrimitive,
 	ExtractKeyType,
-	Key
+	Key,
+	GetItemIdConfig,
+	GetItemIdFunction
 } from 'observator';

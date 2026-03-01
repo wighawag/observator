@@ -12,6 +12,7 @@ import {
 	SubscriptionsMap,
 	CreateFunction,
 	PatchPath,
+	GetItemIdConfig,
 } from './types.js';
 
 // Re-export types for consumers
@@ -29,17 +30,21 @@ export type {
 	PatchPath,
 	SubscriptionsMap,
 	CreateFunction,
+	GetItemIdConfig,
+	GetItemIdFunction,
 } from './types.js';
 
 function createFromPatchRecorder<T extends NonPrimitive>(
 	state: T,
 	mutate: (state: T) => void,
+	getItemId?: GetItemIdConfig,
 ): [T, Patches] {
-	return [state, recordPatches<T>(state, mutate)];
+	return [state, recordPatches<T>(state, mutate, {getItemId})];
 }
 
 export type ObservableStoreOptions = {
 	createFunction?: CreateFunction;
+	getItemId?: GetItemIdConfig;
 };
 
 type RecursiveMap<Key, Value> = Map<Key, {value?: Value; children?: RecursiveMap<Key, Value>}>;
@@ -94,14 +99,30 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	private specificListeners: RecursiveMap<PatchPath, {listeners: ((patches: Patches) => void)[]}> =
 		new Map();
 
+	private arrayFields: Set<string>;
+
 	constructor(
 		protected state: T,
 		protected options?: ObservableStoreOptions,
 	) {
 		this.create = options?.createFunction ?? createFromPatchRecorder;
 		this.emitter = createEmitter();
+		this.arrayFields = this.detectArrayFields();
 		this.subscriptions = this.createSubscribeHandlers();
 		this.keyedSubscriptions = this.createKeyedSubscribeHandlers();
+	}
+
+	/**
+	 * Detect which fields in the state are arrays
+	 */
+	private detectArrayFields(): Set<string> {
+		const fields = new Set<string>();
+		for (const key of Object.keys(this.state)) {
+			if (Array.isArray(this.state[key as keyof T])) {
+				fields.add(key);
+			}
+		}
+		return fields;
 	}
 
 	/**
@@ -120,7 +141,7 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 * ```
 	 */
 	public update(mutate: (state: T) => void): Patches {
-		const [newState, patches] = this.create(this.state, mutate);
+		const [newState, patches] = this.create(this.state, mutate, this.options?.getItemId);
 		this.state = newState;
 
 		// Group patches by top-level field key
@@ -138,23 +159,35 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 
 			// Conditionally emit keyed events only when there are listeners (performance optimization)
 			if (this.emitter.hasKeyedListeners(eventName)) {
-				const changedKeys = this.extractSecondKeysFromPatches(fieldPatches);
+				const isArrayField = this.arrayFields.has(fieldKey);
 
-				// If field was replaced, notify all registered keyed listeners
-				if (replacedFields.has(fieldKey)) {
-					const registeredKeys = this.emitter.getKeyedListenerKeys(eventName);
-					for (const key of registeredKeys) {
-						changedKeys.add(key as Key);
-					}
+				// For arrays without getItemId, skip keyed events entirely
+				if (isArrayField && !this.options?.getItemId?.[fieldKey]) {
+					continue; // Skip keyed events for this array field
 				}
 
-				// Add removed array indices from length reductions
-				const reduction = lengthReductions.get(fieldKey);
-				if (reduction) {
-					for (let i = reduction.newLength; i < reduction.oldLength; i++) {
-						changedKeys.add(i);
+				const changedKeys = this.extractSecondKeysFromPatches(fieldPatches, isArrayField);
+
+				// For NON-array fields only: handle field replacement and length reductions
+				if (!isArrayField) {
+					// If field was replaced, notify all registered keyed listeners
+					if (replacedFields.has(fieldKey)) {
+						const registeredKeys = this.emitter.getKeyedListenerKeys(eventName);
+						for (const key of registeredKeys) {
+							changedKeys.add(key as Key);
+						}
+					}
+
+					// Handle length reductions (only for Records, not arrays)
+					const reduction = lengthReductions.get(fieldKey);
+					if (reduction) {
+						for (let i = reduction.newLength; i < reduction.oldLength; i++) {
+							changedKeys.add(i);
+						}
 					}
 				}
+				// For array fields: changedKeys only contains IDs from patches that have patch.id
+				// No special handling for field replacement or length reductions - those don't have patch.id
 
 				for (const changedKey of changedKeys) {
 					// Type assertions needed due to TypeScript limitations with generic string literals
@@ -452,11 +485,21 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 * 2. Calls the callback immediately with the current value
 	 * 3. Subscribes to keyed field updates to call the callback on each change
 	 * 4. Returns an unsubscribe function
+	 *
+	 * Note: Arrays without getItemId configuration are skipped because
+	 * keyed events for arrays require getItemId to use item IDs instead of indices.
 	 */
 	private createKeyedSubscribeHandlers(): KeyedSubscriptionsMap<T> {
 		const keyedSubscriptions = {} as KeyedSubscriptionsMap<T>;
 
 		for (const key of Object.keys(this.state) as Array<keyof T>) {
+			const fieldValue = this.state[key];
+
+			// Skip arrays without getItemId configuration
+			if (Array.isArray(fieldValue) && !this.options?.getItemId?.[key as string]) {
+				continue;
+			}
+
 			keyedSubscriptions[key] = (subscriptionKey: ExtractKeyType<T[typeof key]>) => {
 				return (callback: (value: Readonly<T[keyof T]>) => void) => {
 					// Call immediately with current value
@@ -478,14 +521,25 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 
 	/**
 	 * Extract unique keys from patches
+	 * For arrays with getItemId, uses patch.id instead of array index
 	 * @param patches - Array of JSON patches
-	 * @returns Set of unique keys found in patch paths
+	 * @param isArrayField - Whether this field is an array
+	 * @returns Set of unique keys found in patch paths or patch.id for arrays
 	 */
-	private extractSecondKeysFromPatches(patches: Patches): Set<Key> {
+	private extractSecondKeysFromPatches(patches: Patches, isArrayField: boolean): Set<Key> {
 		const keys = new Set<Key>();
 		for (const patch of patches) {
-			if (patch.path.length > 1) {
-				keys.add(patch.path[1]);
+			if (isArrayField) {
+				// For arrays, use patch.id if available
+				if (patch.id !== undefined && patch.id !== null) {
+					keys.add(patch.id);
+				}
+				// If no patch.id, don't add any key (arrays without getItemId don't support keyed events)
+			} else {
+				// For non-arrays, use the second path element as before
+				if (patch.path.length > 1) {
+					keys.add(patch.path[1]);
+				}
 			}
 		}
 		return keys;
