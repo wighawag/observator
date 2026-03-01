@@ -157,22 +157,33 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 		const hasGetItemId = typeof getItemIdFn === 'function';
 
 		const proxy = new Proxy(target, {
-			get(target: V, prop: string | symbol, receiver: any): any {
+			get(_target: V, prop: string | symbol, receiver: any): any {
+				// Always get current state from store, not cached target (Issue 2: Stale proxy cache)
+				const currentTarget = store.observableStore.get(field as keyof T) as V;
+
 				// Pass through symbols (iterators, etc.)
 				if (typeof prop === 'symbol') {
-					return Reflect.get(target, prop, receiver);
+					return Reflect.get(currentTarget, prop, receiver);
 				}
 
 				// Pass through built-in methods/properties
 				if (BUILTIN_PROPS.has(prop)) {
-					return Reflect.get(target, prop, receiver);
+					// For arrays, .length should be reactive (Issue 1: Array length not reactive)
+					if (isArray && prop === 'length') {
+						store.getOrCreateFieldSubscriber(field as keyof T)();
+					}
+					return Reflect.get(currentTarget, prop, receiver);
 				}
 
-				const value = Reflect.get(target, prop, receiver);
+				const value = Reflect.get(currentTarget, prop, receiver);
 
 				// Handle array access
 				if (isArray && /^\d+$/.test(prop)) {
-					// For arrays with getItemId, use item ID for subscription
+					// For arrays with getItemId, use item ID for keyed subscription
+					// This provides fine-grained reactivity where only the affected item's effect re-runs
+					// Note: observator does NOT emit keyed events for item removals, so effects
+					// subscribed to removed items won't re-run. Users tracking structural changes
+					// should also access the array itself (e.g., iterate over it or access .length)
 					if (hasGetItemId && value !== undefined && value !== null) {
 						const itemId = (getItemIdFn as (value: any) => string | number | undefined | null)(value);
 						if (itemId !== undefined && itemId !== null) {
