@@ -21,11 +21,11 @@ export type EventNames<T extends Record<string, unknown>> =
 export type Key = string | number | symbol | object;
 
 /**
- * Extract only Record field names from state type (excludes Array fields)
- * @example ExtractRecordFields<{ users: Record<string, User>, items: string[] }> // 'users'
+ * Extract only Record field names from state type (excludes Array fields and primitives)
+ * @example ExtractRecordFields<{ users: Record<string, User>, items: string[], counter: number }> // 'users'
  */
 export type ExtractRecordFields<T extends Record<string, unknown>> = {
-	[K in keyof T]: T[K] extends Array<any> ? never : K;
+	[K in keyof T]: T[K] extends Array<any> ? never : T[K] extends object ? K : never;
 }[keyof T];
 
 /**
