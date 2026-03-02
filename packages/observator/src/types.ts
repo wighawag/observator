@@ -21,6 +21,36 @@ export type EventNames<T extends Record<string, unknown>> =
 export type Key = string | number | symbol | object;
 
 /**
+ * Extract only Record field names from state type (excludes Array fields)
+ * @example ExtractRecordFields<{ users: Record<string, User>, items: string[] }> // 'users'
+ */
+export type ExtractRecordFields<T extends Record<string, unknown>> = {
+	[K in keyof T]: T[K] extends Array<any> ? never : K;
+}[keyof T];
+
+/**
+ * Extract only Array field names from state type
+ * @example ExtractArrayFields<{ users: Record<string, User>, items: string[] }> // 'items'
+ */
+export type ExtractArrayFields<T extends Record<string, unknown>> = {
+	[K in keyof T]: T[K] extends Array<any> ? K : never;
+}[keyof T];
+
+/**
+ * Event names for Record fields only
+ */
+export type RecordEventNames<T extends Record<string, unknown>> = EventName<
+	ExtractRecordFields<T> & string
+>;
+
+/**
+ * Event names for Array fields only
+ */
+export type ArrayEventNames<T extends Record<string, unknown>> = EventName<
+	ExtractArrayFields<T> & string
+>;
+
+/**
  * Extract key type from a field type
  * - For Record<K, V>, extracts K as the key type (constrained to Key)
  * - For Array<V>, extracts number as the key type (array indices)
@@ -36,6 +66,23 @@ export type ExtractKeyType<T> =
 				? K
 				: string
 			: string;
+
+/**
+ * Extract key type for Records - only allows Key types
+ * Returns never for array types
+ */
+export type ExtractRecordKeyType<T> = T extends Array<any>
+	? never
+	: T extends Record<infer K, any>
+		? K extends Key
+			? K
+			: string
+		: never;
+
+/**
+ * Extract ID type from array items (always string | number from getItemId)
+ */
+export type ExtractItemIdType<T> = T extends Array<any> ? string | number : never;
 
 /**
  * Keyed event map type for fine-grained subscriptions
@@ -70,8 +117,8 @@ export type SubscriptionsMap<T extends Record<string, unknown>> = {
 };
 
 /**
- * Keyed subscriptions map type for value-based keyed subscriptions
- * Maps each field key to a function that takes a key and returns a subscribe function
+ * Key subscriptions map type for value-based subscriptions on Record fields
+ * Maps each Record field key to a function that takes a key and returns a subscribe function
  * The subscribe function:
  * - Executes the callback immediately with the current value
  * - Executes the callback on every field update for that specific key
@@ -80,13 +127,49 @@ export type SubscriptionsMap<T extends Record<string, unknown>> = {
  * @example
  * ```ts
  * type State = { users: Record<string, { name: string }> };
- * type KeyedSubscriptionsMap = KeyedSubscriptionsMap<State>;
+ * type KeySubscriptionsMap = KeySubscriptionsMap<State>;
  * // {
  * //   users: {
- * //     (key: string): (callback: (value: { name: string }) => void) => () => void;
+ * //     (key: string): (callback: (value: Record<string, { name: string }>) => void) => () => void;
  * //   }
  * // }
  * ```
+ */
+export type KeySubscriptionsMap<T extends Record<string, unknown>> = {
+	[K in ExtractRecordFields<T>]: {
+		(key: ExtractRecordKeyType<T[K]>): (callback: (value: Readonly<T[K]>) => void) => () => void;
+	};
+};
+
+/**
+ * Item ID subscriptions map type for value-based subscriptions on Array fields
+ * Maps each Array field key to a function that takes an item ID and returns a subscribe function
+ * The subscribe function:
+ * - Executes the callback immediately with the current value
+ * - Executes the callback on every field update for that specific item ID
+ * - Returns an unsubscribe function
+ *
+ * NOTE: Only fires when item properties are updated, NOT when item is removed.
+ *
+ * @example
+ * ```ts
+ * type State = { todos: Array<{ id: string; text: string }> };
+ * type ItemIdSubscriptionsMap = ItemIdSubscriptionsMap<State>;
+ * // {
+ * //   todos: {
+ * //     (itemId: string | number): (callback: (value: Array<...>) => void) => () => void;
+ * //   }
+ * // }
+ * ```
+ */
+export type ItemIdSubscriptionsMap<T extends Record<string, unknown>> = {
+	[K in ExtractArrayFields<T>]: {
+		(itemId: string | number): (callback: (value: Readonly<T[K]>) => void) => () => void;
+	};
+};
+
+/**
+ * @deprecated Use KeySubscriptionsMap for Record fields or ItemIdSubscriptionsMap for Array fields
  */
 export type KeyedSubscriptionsMap<T extends Record<string, unknown>> = {
 	[K in keyof T]: {

@@ -370,9 +370,9 @@ store.update((state) => {
 // Only callback2 fires
 ```
 
-### Keyed Events - Subscribe to Specific Keys
+### Key-based Events - Subscribe to Specific Keys in Records
 
-For fields containing records or arrays, you can subscribe to changes for specific keys:
+For fields containing Record types, you can subscribe to changes for specific keys using `onKey`:
 
 ```typescript
 import {createObservableStore} from 'observator';
@@ -389,7 +389,7 @@ const store = createObservableStore<State>({
 });
 
 // Subscribe to specific user changes
-const unsubscribe1 = store.onKeyed('users:updated', 'user-1', (patches) => {
+const unsubscribe1 = store.onKey('users:updated', 'user-1', (patches) => {
   console.log('User 1 changed:', patches);
 });
 
@@ -408,39 +408,48 @@ store.update((state) => {
 unsubscribe1();
 ```
 
-#### Wildcard Subscription
+#### Wildcard Subscription for Records
 
-Subscribe to all keys in a field using the wildcard `'*'`:
+Subscribe to all keys in a Record field using the wildcard `'*'`:
 
 ```typescript
 // Subscribe to all user changes
-const unsubscribe = store.onKeyed('users:updated', '*', (userId, patches) => {
+const unsubscribe = store.onKey('users:updated', '*', (userId, patches) => {
   console.log(`User ${userId} changed:`, patches);
 });
 
 store.update((state) => {
   state.users['user-1'].name = 'Johnny';
-  state.user['user-2'].name = 'Janet';
+  state.users['user-2'].name = 'Janet';
 });
 
 unsubscribe();
 ```
 
-#### Arrays Without `getItemId`
+#### Key Deletion in Records
 
-**⚠️ Important:** Arrays without `getItemId` configured do **NOT** support keyed events. Any `onKeyed` subscriptions for such arrays will simply never fire.
-
-For arrays, you must choose one of these approaches:
-1. **ID-based subscriptions** with `getItemId` option (see [ID-Based Array Subscriptions](#id-based-array-subscriptions-getitemid))
-2. **Field-level subscriptions** (`items:updated`) for the whole array
+**Important:** For Record fields, `onKey` callbacks fire when a key is deleted or replaced:
 
 ```typescript
-// Without getItemId, keyed events for arrays are disabled:
+const callback = vi.fn();
+store.onKey('users:updated', 'user-1', callback);
+
+store.update((state) => {
+  delete state.users['user-1'];  // callback FIRES for deletion
+});
+```
+
+#### Arrays Without `getItemId`
+
+For arrays, use the `onItemId` method with `getItemId` configuration. Without `getItemId`, attempting to use `onItemId` will throw an error:
+
+```typescript
+// Without getItemId, onItemId throws an error:
 const store = createObservableStore<{ items: number[] }>({ items: [1, 2, 3] });
 
-// ❌ This callback will NEVER fire for arrays without getItemId
-store.onKeyed('items:updated', 0, (patches) => {
-  console.log('This will never be called!');
+// ❌ This throws: "onItemId requires getItemId configuration for field 'items'"
+store.onItemId('items:updated', 0, (patches) => {
+  console.log('This will throw!');
 });
 
 // ✅ Use field-level subscription instead
@@ -454,7 +463,7 @@ store.on('items:updated', (patches) => {
 
 ### ID-Based Array Subscriptions (`getItemId`)
 
-For arrays where items have unique identifiers, use the `getItemId` option to enable stable, identity-based keyed subscriptions. This is the recommended approach for arrays.
+For arrays where items have unique identifiers, use the `getItemId` option to enable stable, identity-based subscriptions with `onItemId`. This is the recommended approach for arrays.
 
 ```typescript
 type State = {
@@ -476,7 +485,7 @@ const store = createObservableStore<State>(
 );
 
 // Subscribe to todo with ID 1 (not index 0!)
-store.onKeyed('todos:updated', 1, (patches) => {
+store.onItemId('todos:updated', 1, (patches) => {
   console.log('Todo with ID 1 changed:', patches);
 });
 
@@ -494,9 +503,9 @@ store.update((state) => {
 // The callback fires correctly because we subscribed to ID 1, not index 1
 ```
 
-#### Important Limitations of `getItemId`
+#### Important Limitations of `onItemId`
 
-**The `getItemId` feature only tracks property updates within items.** The following operations do **NOT** emit keyed events:
+**The `onItemId` feature only tracks property updates within items.** The following operations do **NOT** emit keyed events:
 
 1. **Item Removal** - When an item is removed (via `splice`, `pop`, `shift`, `filter`, etc.), no keyed event is emitted for the removed item's ID:
 
@@ -507,7 +516,7 @@ const store = createObservableStore<State>(
 );
 
 const callback = vi.fn();
-store.onKeyed('items:updated', 'a', callback);
+store.onItemId('items:updated', 'a', callback);
 
 // ⚠️ No keyed event fires when 'a' is removed!
 store.update((state) => {
@@ -541,15 +550,13 @@ store.update((state) => {
 
 **Why?** The underlying `patch-recorder` library only populates `patch.id` when a property of an existing item is updated. Removals and full replacements generate patches at the array index level, not the item property level.
 
-#### When to Use `getItemId`
+#### When to Use `onItemId` vs `onKey`
 
-| Use Case | Recommendation |
-|----------|----------------|
-| Track item property updates | ✅ Use `getItemId` |
-| Track item additions | ❌ Use field-level subscription |
-| Track item removals | ❌ Use field-level subscription |
-| Track item replacements | ❌ Use field-level subscription |
-| Track reordering | ❌ Use field-level subscription |
+| Field Type | Method | Use Case |
+|------------|--------|----------|
+| `Record<K, V>` | `onKey` | Track key updates, deletions, replacements |
+| `Array<T>` (with getItemId) | `onItemId` | Track item property updates only |
+| `Array<T>` (without getItemId) | `on` (field-level) | Track all array changes |
 
 #### Combining Both Patterns
 
@@ -563,7 +570,7 @@ store.on('items:updated', (patches) => {
 });
 
 // ID-based for specific item property updates
-store.onKeyed('items:updated', 'item-123', (patches) => {
+store.onItemId('items:updated', 'item-123', (patches) => {
   // Fires only when item-123's properties are updated
   console.log('Item 123 properties changed');
 });
@@ -612,13 +619,13 @@ const store = createObservableStore<State>(
 - Return `string` or `number` for a valid ID
 - Return `undefined` or `null` to skip keyed event emission for that item
 
-#### Single Emission
+#### Single Emission for Records
 
-Subscribe for a single event using `onceKeyed`:
+Subscribe for a single event using `onceKey`:
 
 ```typescript
-// Subscribe for single emission
-store.onceKeyed('users:updated', 'user-1', (patches) => {
+// Subscribe for single emission (Records)
+store.onceKey('users:updated', 'user-1', (patches) => {
   console.log('User 1 changed once:', patches);
 });
 
@@ -633,28 +640,45 @@ store.update((state) => {
 // Callback does NOT fire again
 ```
 
+#### Single Emission for Arrays
+
+Subscribe for a single event using `onceItemId`:
+
+```typescript
+// Subscribe for single emission (Arrays with getItemId)
+store.onceItemId('todos:updated', 1, (patches) => {
+  console.log('Todo 1 changed once:', patches);
+});
+```
+
 #### Unsubscribe Specific Listener
 
 Remove a specific listener from a keyed event:
 
 ```typescript
+// For Records
 const callback1 = (patches) => console.log('Callback 1:', patches);
 const callback2 = (patches) => console.log('Callback 2:', patches);
 
-store.onKeyed('users:updated', 'user-1', callback1);
-store.onKeyed('users:updated', 'user-1', callback2);
+store.onKey('users:updated', 'user-1', callback1);
+store.onKey('users:updated', 'user-1', callback2);
 
 store.update((state) => {
   state.users['user-1'].name = 'Johnny';
 });
 // Both callbacks fire
 
-store.offKeyed('users:updated', 'user-1', callback1);
+store.offKey('users:updated', 'user-1', callback1);
 
 store.update((state) => {
   state.users['user-1'].name = 'John';
 });
 // Only callback2 fires
+
+// For Arrays with getItemId
+const todoCallback = (patches) => console.log('Todo changed:', patches);
+store.onItemId('todos:updated', 1, todoCallback);
+store.offItemId('todos:updated', 1, todoCallback);
 ```
 
 ### Multiple Subscribers
@@ -764,7 +788,7 @@ const store = createObservableStore<State>(
 );
 
 // Now you can subscribe using item IDs instead of indices
-store.onKeyed('todos:updated', 1, (patches) => {
+store.onItemId('todos:updated', 1, (patches) => {
   console.log('Todo with ID 1 changed:', patches);
 });
 ```
@@ -943,39 +967,35 @@ const unsubscribeAll = store.once('*', (patches) => {
 });
 ```
 
-#### `onKeyed<K extends keyof T>(event: EventName<K>, key: Key, callback: (patches: Patches) => void): () => void`
+#### `onKey(event: EventName<K>, key: Key, callback: (patches: Patches) => void): () => void`
 
-Subscribes to updates for a specific key within a field.
-
-**Type Parameters:**
-- `K` - The field key to subscribe to
+Subscribes to updates for a specific key within a **Record field**.
 
 **Parameters:**
-- `event` - The event name in format `${fieldName}:updated`
-- `key` - The specific key to listen for (e.g., user ID, array index)
+- `event` - The event name in format `${fieldName}:updated` (must be a Record field)
+- `key` - The specific key to listen for (e.g., user ID)
 - `callback` - Callback function that receives the patches array
 
 **Returns:**
 - Unsubscribe function
 
+**Note:** For Record fields, callbacks fire for key updates, deletions, and replacements.
+
 **Example:**
 ```typescript
-const unsubscribe = store.onKeyed('users:updated', 'user-123', (patches) => {
+const unsubscribe = store.onKey('users:updated', 'user-123', (patches) => {
   console.log('User 123 changed:', patches);
 });
 
 unsubscribe();
 ```
 
-#### `onKeyed<K extends keyof T>(event: EventName<K>, key: '*', callback: (key: ExtractKeyType<T[K]>, patches: Patches) => void): () => void`
+#### `onKey(event: EventName<K>, key: '*', callback: (key: string, patches: Patches) => void): () => void`
 
-Subscribes to all keys within a field (wildcard subscription).
-
-**Type Parameters:**
-- `K` - The field key to subscribe to
+Subscribes to all keys within a Record field (wildcard subscription).
 
 **Parameters:**
-- `event` - The event name in format `${fieldName}:updated`
+- `event` - The event name in format `${fieldName}:updated` (must be a Record field)
 - `key` - Use `'*'` to listen to all keys
 - `callback` - Callback function that receives the key and patches array
 
@@ -984,36 +1004,36 @@ Subscribes to all keys within a field (wildcard subscription).
 
 **Example:**
 ```typescript
-const unsubscribe = store.onKeyed('users:updated', '*', (userId, patches) => {
+const unsubscribe = store.onKey('users:updated', '*', (userId, patches) => {
   console.log(`User ${userId} changed:`, patches);
 });
 
 unsubscribe();
 ```
 
-#### `offKeyed<K extends keyof T>(event: EventName<K>, key: Key, callback: (patches: Patches) => void): void`
+#### `offKey(event: EventName<K>, key: Key, callback: (patches: Patches) => void): void`
 
-Unsubscribes a specific listener from a keyed event.
+Unsubscribes a specific listener from a keyed Record event.
 
 **Parameters:**
-- `event` - The event name in format `${fieldName}:updated`
+- `event` - The event name in format `${fieldName}:updated` (must be a Record field)
 - `key` - The specific key to unsubscribe from
 - `callback` - The exact callback function to remove
 
 **Example:**
 ```typescript
 const callback = (patches) => console.log('Changed:', patches);
-store.onKeyed('users:updated', 'user-123', callback);
+store.onKey('users:updated', 'user-123', callback);
 
-store.offKeyed('users:updated', 'user-123', callback);
+store.offKey('users:updated', 'user-123', callback);
 ```
 
-#### `onceKeyed<K extends keyof T>(event: EventName<K>, key: Key, callback: (patches: Patches) => void): () => void`
+#### `onceKey(event: EventName<K>, key: Key, callback: (patches: Patches) => void): () => void`
 
-Subscribes to a keyed event for a single emission only.
+Subscribes to a keyed Record event for a single emission only.
 
 **Parameters:**
-- `event` - The event name in format `${fieldName}:updated`
+- `event` - The event name in format `${fieldName}:updated` (must be a Record field)
 - `key` - The specific key to listen for
 - `callback` - Callback function that receives the patches array
 
@@ -1022,29 +1042,69 @@ Subscribes to a keyed event for a single emission only.
 
 **Example:**
 ```typescript
-const unsubscribe = store.onceKeyed('users:updated', 'user-123', (patches) => {
+const unsubscribe = store.onceKey('users:updated', 'user-123', (patches) => {
   console.log('User 123 changed once:', patches);
 });
 
 // Callback will fire once, then automatically unsubscribe
 ```
 
-#### `onceKeyed<K extends keyof T>(event: EventName<K>, key: '*', callback: (key: ExtractKeyType<T[K]>, patches: Patches) => void): () => void`
+#### `onItemId(event: EventName<K>, itemId: Key, callback: (patches: Patches) => void): () => void`
 
-Subscribes to all keys within a field for a single emission only (wildcard).
+Subscribes to updates for a specific item ID within an **Array field** (requires `getItemId` configuration).
 
 **Parameters:**
-- `event` - The event name in format `${fieldName}:updated`
-- `key` - Use `'*'` to listen to all keys
-- `callback` - Callback function that receives the key and patches array
+- `event` - The event name in format `${fieldName}:updated` (must be an Array field with getItemId)
+- `itemId` - The item ID to listen for (as returned by getItemId)
+- `callback` - Callback function that receives the patches array
+
+**Returns:**
+- Unsubscribe function
+
+**Note:** For Array fields, callbacks fire **only** for item property updates, NOT for item removal or replacement.
+
+**Example:**
+```typescript
+const unsubscribe = store.onItemId('todos:updated', 1, (patches) => {
+  console.log('Todo with ID 1 changed:', patches);
+});
+
+unsubscribe();
+```
+
+#### `offItemId(event: EventName<K>, itemId: Key, callback: (patches: Patches) => void): void`
+
+Unsubscribes a specific listener from an Array item ID event.
+
+**Parameters:**
+- `event` - The event name in format `${fieldName}:updated` (must be an Array field with getItemId)
+- `itemId` - The item ID to unsubscribe from
+- `callback` - The exact callback function to remove
+
+**Example:**
+```typescript
+const callback = (patches) => console.log('Changed:', patches);
+store.onItemId('todos:updated', 1, callback);
+
+store.offItemId('todos:updated', 1, callback);
+```
+
+#### `onceItemId(event: EventName<K>, itemId: Key, callback: (patches: Patches) => void): () => void`
+
+Subscribes to an Array item ID event for a single emission only.
+
+**Parameters:**
+- `event` - The event name in format `${fieldName}:updated` (must be an Array field with getItemId)
+- `itemId` - The item ID to listen for
+- `callback` - Callback function that receives the patches array
 
 **Returns:**
 - Unsubscribe function to remove listener before it fires
 
 **Example:**
 ```typescript
-const unsubscribe = store.onceKeyed('users:updated', '*', (userId, patches) => {
-  console.log(`User ${userId} changed once:`, patches);
+const unsubscribe = store.onceItemId('todos:updated', 1, (patches) => {
+  console.log('Todo 1 changed once:', patches);
 });
 
 // Callback will fire once, then automatically unsubscribe
@@ -1180,12 +1240,12 @@ type State = {
 const store = createObservableStore<State>({ users: {} });
 
 // ✅ Valid
-store.onKeyed('users:updated', 'user-1', (patches) => {
+store.onKey('users:updated', 'user-1', (patches) => {
   console.log(patches);
 });
 
 // ❌ Type error: Invalid event name
-store.onKeyed('invalid:updated', 'user-1', (patches) => {
+store.onKey('invalid:updated', 'user-1', (patches) => {
   // Type error
 });
 
@@ -1236,7 +1296,7 @@ store.update('users', (state) => {
 // Only regular event is emitted
 
 // Add keyed listener - now keyed events are emitted
-store.onKeyed('users:updated', 'user-1', (patches) => {
+store.onKey('users:updated', 'user-1', (patches) => {
   console.log('Keyed event:', patches);
 });
 

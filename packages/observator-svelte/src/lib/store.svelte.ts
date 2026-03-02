@@ -143,16 +143,41 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 
 	/**
 	 * Get or create a keyed subscriber for a specific field and key.
-	 * Creates a subscription via onKeyed for granular reactivity.
+	 * - For Record fields: uses onKey (fires on update, delete, replace)
+	 * - For Array fields with getItemId: uses onItemId (fires only on property updates)
+	 *
+	 * @param field - The field name
+	 * @param key - The key (Record key) or item ID (Array item ID)
+	 * @param isArrayWithGetItemId - Whether this is an array field with getItemId configured
 	 */
-	private ensureKeyedSubscription(field: string, key: string | number | symbol): void {
+	private ensureKeyedSubscription(
+		field: string,
+		key: string | number | symbol,
+		isArrayWithGetItemId: boolean
+	): void {
 		const cacheKey = `${field}:${String(key)}`;
 		if (!this.keyedSubscribers.has(cacheKey)) {
 			const subscriber = createSubscriber((update) => {
 				const eventName = `${field}:updated` as `${string}:updated`;
-				const unsubscribe = this.observableStore.onKeyed(eventName as any, key as Key, () => {
-					update();
-				});
+				let unsubscribe: () => void;
+
+				if (isArrayWithGetItemId) {
+					// Use onItemId for arrays with getItemId config
+					// onItemId only accepts string | number, not symbol
+					unsubscribe = this.observableStore.onItemId(
+						eventName as any,
+						key as string | number,
+						() => {
+							update();
+						}
+					);
+				} else {
+					// Use onKey for Record fields
+					unsubscribe = this.observableStore.onKey(eventName as any, key as Key, () => {
+						update();
+					});
+				}
+
 				return () => unsubscribe();
 			});
 			this.keyedSubscribers.set(cacheKey, subscriber);
@@ -212,10 +237,11 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 						);
 						if (itemId !== undefined && itemId !== null) {
 							// Use item ID for keyed subscription (in addition to structural)
-							store.ensureKeyedSubscription(field, itemId);
+							// Pass true since this is an array with getItemId
+							store.ensureKeyedSubscription(field, itemId, true);
 							// Wrap return value in PropertyProxy using itemId as key
 							if (typeof value === 'object') {
-								return store.createPropertyProxy(field, itemId, value as object);
+								return store.createPropertyProxy(field, itemId, value as object, true);
 							}
 							return value;
 						}
@@ -228,11 +254,11 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 					return value;
 				}
 
-				// Non-array: use property key
-				store.ensureKeyedSubscription(field, prop);
+				// Non-array: use property key (pass false since this is a Record field)
+				store.ensureKeyedSubscription(field, prop, false);
 				// If value is an object, wrap in PropertyProxy for deeper access
 				if (value !== null && typeof value === 'object') {
-					return store.createPropertyProxy(field, prop, value as object);
+					return store.createPropertyProxy(field, prop, value as object, false);
 				}
 
 				return value;
@@ -256,11 +282,17 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 	/**
 	 * Create a PropertyProxy for nested object values.
 	 * Reuses the parent's keyed subscription for granularity.
+	 *
+	 * @param field - The field name
+	 * @param parentKey - The parent key (Record key or item ID)
+	 * @param target - The target object to proxy
+	 * @param isArrayWithGetItemId - Whether this is an array field with getItemId configured
 	 */
 	private createPropertyProxy<V extends object>(
 		field: string,
 		parentKey: string | number | symbol,
-		target: V
+		target: V,
+		isArrayWithGetItemId: boolean
 	): V {
 		const cacheKey = `${field}:${String(parentKey)}`;
 		if (this.propertyProxyCache.has(cacheKey)) {
@@ -281,7 +313,7 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 				}
 
 				// Ensure the parent keyed subscription is active
-				store.ensureKeyedSubscription(field, parentKey);
+				store.ensureKeyedSubscription(field, parentKey, isArrayWithGetItemId);
 
 				const value = Reflect.get(target, prop, receiver);
 
@@ -297,7 +329,7 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 									return Reflect.get(target, nestedProp, receiver);
 								}
 								// Reuse parent's subscription
-								store.ensureKeyedSubscription(field, parentKey);
+								store.ensureKeyedSubscription(field, parentKey, isArrayWithGetItemId);
 								return Reflect.get(target, nestedProp, receiver);
 							}
 						});

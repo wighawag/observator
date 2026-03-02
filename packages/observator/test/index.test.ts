@@ -427,7 +427,7 @@ describe('ObservableStore', () => {
 				// No changes
 			});
 
-			// mutative will still emit patches even if no changes occurred
+			// patch-recorder will still emit patches even if no changes occurred
 			// but patches array should be empty
 			expect(store.get('count')).toEqual({value: 0});
 		});
@@ -506,7 +506,7 @@ describe('ObservableStore', () => {
 				});
 
 				const callback = vi.fn();
-				store.onKeyed('users:updated', 'user-1', callback);
+				store.onKey('users:updated', 'user-1', callback);
 
 				store.update((state) => {
 					state.users['user-1'].name = 'Johnny';
@@ -536,7 +536,7 @@ describe('ObservableStore', () => {
 				});
 
 				const callback = vi.fn();
-				store.onKeyed('users:updated', 'user-1', callback);
+				store.onKey('users:updated', 'user-1', callback);
 
 				store.update((state) => {
 					state.users['user-2'].name = 'Janet';
@@ -558,7 +558,7 @@ describe('ObservableStore', () => {
 				});
 
 				const callback = vi.fn();
-				store.onKeyed('users:updated', '*', (key, patches) => {
+				store.onKey('users:updated', '*', (key, patches) => {
 					callback(key, patches);
 				});
 
@@ -589,8 +589,8 @@ describe('ObservableStore', () => {
 				const callback1 = vi.fn();
 				const callback2 = vi.fn();
 
-				store.onKeyed('users:updated', 'user-1', callback1);
-				store.onKeyed('users:updated', 'user-1', callback2);
+				store.onKey('users:updated', 'user-1', callback1);
+				store.onKey('users:updated', 'user-1', callback2);
 
 				store.update((state) => {
 					state.users['user-1'].name = 'Johnny';
@@ -612,7 +612,7 @@ describe('ObservableStore', () => {
 				});
 
 				const callback = vi.fn();
-				const unsubscribe = store.onKeyed('users:updated', 'user-1', callback);
+				const unsubscribe = store.onKey('users:updated', 'user-1', callback);
 
 				store.update((state) => {
 					state.users['user-1'].name = 'Johnny';
@@ -629,7 +629,7 @@ describe('ObservableStore', () => {
 				expect(callback).toHaveBeenCalledTimes(1);
 			});
 
-			it('should support onceKeyed for single emission', () => {
+			it('should support onceKey for single emission', () => {
 				type State = {
 					users: Record<string, {name: string}>;
 				};
@@ -641,7 +641,7 @@ describe('ObservableStore', () => {
 				});
 
 				const callback = vi.fn();
-				store.onceKeyed('users:updated', 'user-1', callback);
+				store.onceKey('users:updated', 'user-1', callback);
 
 				store.update((state) => {
 					state.users['user-1'].name = 'Johnny';
@@ -656,7 +656,7 @@ describe('ObservableStore', () => {
 				expect(callback).toHaveBeenCalledTimes(1); // Still only once
 			});
 
-			it('should support onceKeyed with wildcard', () => {
+			it('should support onceKey with wildcard', () => {
 				type State = {
 					users: Record<string, {name: string}>;
 				};
@@ -669,7 +669,7 @@ describe('ObservableStore', () => {
 				});
 
 				const callback = vi.fn();
-				store.onceKeyed('users:updated', '*', (key, patches) => {
+				store.onceKey('users:updated', '*', (key, patches) => {
 					callback(key, patches);
 				});
 
@@ -684,7 +684,7 @@ describe('ObservableStore', () => {
 				expect(callback).toHaveBeenCalledTimes(1);
 			});
 
-			it('should support offKeyed for specific listener removal', () => {
+			it('should support offKey for specific listener removal', () => {
 				type State = {
 					users: Record<string, {name: string}>;
 				};
@@ -698,8 +698,8 @@ describe('ObservableStore', () => {
 				const callback1 = vi.fn();
 				const callback2 = vi.fn();
 
-				store.onKeyed('users:updated', 'user-1', callback1);
-				store.onKeyed('users:updated', 'user-1', callback2);
+				store.onKey('users:updated', 'user-1', callback1);
+				store.onKey('users:updated', 'user-1', callback2);
 
 				store.update((state) => {
 					state.users['user-1'].name = 'Johnny';
@@ -708,7 +708,7 @@ describe('ObservableStore', () => {
 				expect(callback1).toHaveBeenCalledTimes(1);
 				expect(callback2).toHaveBeenCalledTimes(1);
 
-				store.offKeyed('users:updated', 'user-1', callback1);
+				store.offKey('users:updated', 'user-1', callback1);
 
 				store.update((state) => {
 					state.users['user-1'].name = 'John';
@@ -735,7 +735,7 @@ describe('ObservableStore', () => {
 
 				const callback = vi.fn();
 				// Now subscribe using item ID instead of index
-				store.onKeyed('todos:updated', 1, callback);
+				store.onItemId('todos:updated', 1, callback);
 
 				store.update((state) => {
 					state.todos[0].done = true;
@@ -799,7 +799,7 @@ describe('ObservableStore', () => {
 
 				// Add keyed listener
 				const keyedCallback = vi.fn();
-				store.onKeyed('users:updated', 'user-1', keyedCallback);
+				store.onKey('users:updated', 'user-1', keyedCallback);
 
 				// Second update with keyed listeners
 				store.update((state) => {
@@ -822,7 +822,7 @@ describe('ObservableStore', () => {
 				});
 
 				const callback = vi.fn();
-				store.onKeyed('users:updated', 'user-1', callback);
+				store.onKey('users:updated', 'user-1', callback);
 
 				store.update((state) => {
 					// No changes
@@ -842,7 +842,7 @@ describe('ObservableStore', () => {
 				});
 
 				const callback = vi.fn();
-				store.onKeyed('data:updated', 'any-key', callback);
+				store.onKey('data:updated', 'any-key', callback);
 
 				// If patches have no path, no keyed events should be emitted
 				store.update((state) => {
@@ -914,8 +914,8 @@ describe('ObservableStore', () => {
 				const callback1 = vi.fn();
 				const callback2 = vi.fn();
 
-				store.onKeyed('users:updated', 'user-1', callback1);
-				store.onKeyed('users:updated', 'user-2', callback2);
+				store.onKey('users:updated', 'user-1', callback1);
+				store.onKey('users:updated', 'user-2', callback2);
 
 				store.update((state) => {
 					state.users['user-1'].name = 'Johnny';
@@ -947,7 +947,7 @@ describe('ObservableStore', () => {
 				store.on('users:updated', regularCallback);
 
 				const keyedCallback = vi.fn();
-				store.onKeyed('users:updated', 'user-1', keyedCallback);
+				store.onKey('users:updated', 'user-1', keyedCallback);
 
 				store.update((state) => {
 					state.users['user-1'].name = 'Johnny';
@@ -971,8 +971,8 @@ describe('ObservableStore', () => {
 				});
 
 				const callback = vi.fn();
-				// Note: mutative converts numeric keys to strings in patch paths
-				store.onKeyed('items:updated', '1', callback);
+				// Note: patch-recorder converts numeric keys to strings in patch paths
+				store.onKey('items:updated', '1', callback);
 
 				store.update((state) => {
 					state.items[1].value = 'ONE';
@@ -981,8 +981,9 @@ describe('ObservableStore', () => {
 				expect(callback).toHaveBeenCalledTimes(1);
 			});
 
+			// TODO
 			// symbol seems to be supported at runtime but not in the type system
-			// Technically mutative support them though its type system does not seem to
+			// Technically  support them though its type system does not seem to
 			// it('should handle symbol keys', () => {
 			// 	type State = {
 			// 		items: Record<symbol, { value: string }>;
@@ -991,7 +992,7 @@ describe('ObservableStore', () => {
 			// 	const key1 = Symbol('key1');
 			// 	const key2 = Symbol('key2');
 
-			// 	const store = createMutativeEmitter<State>({
+			// 	const store = createObservableStore<State>({
 			// 		items: {
 			// 			[key1]: { value: 'one' },
 			// 			[key2]: { value: 'two' }
@@ -1016,7 +1017,7 @@ describe('ObservableStore', () => {
 					});
 
 					const callback = vi.fn();
-					store.onKeyed('user:updated', 'name', callback);
+					store.onKey('user:updated', 'name', callback);
 
 					store.update((s) => {
 						s.user = {name: 'Bob', age: 25}; // Full replacement
@@ -1036,8 +1037,8 @@ describe('ObservableStore', () => {
 
 					const nameCallback = vi.fn();
 					const ageCallback = vi.fn();
-					store.onKeyed('user:updated', 'name', nameCallback);
-					store.onKeyed('user:updated', 'age', ageCallback);
+					store.onKey('user:updated', 'name', nameCallback);
+					store.onKey('user:updated', 'age', ageCallback);
 
 					store.update((s) => {
 						s.user = {name: 'Bob', age: 25};
@@ -1059,8 +1060,8 @@ describe('ObservableStore', () => {
 
 					const usersCallback = vi.fn();
 					const settingsCallback = vi.fn();
-					store.onKeyed('users:updated', 'user-1', usersCallback);
-					store.onKeyed('settings:updated', 'theme', settingsCallback);
+					store.onKey('users:updated', 'user-1', usersCallback);
+					store.onKey('settings:updated', 'theme', settingsCallback);
 
 					store.update((s) => {
 						s.users = {'user-1': {name: 'Jane'}, 'user-2': {name: 'Bob'}}; // Full replacement
@@ -1083,9 +1084,9 @@ describe('ObservableStore', () => {
 					const callback1 = vi.fn();
 					const callback2 = vi.fn();
 					const callback3 = vi.fn();
-					store.onKeyed('users:updated', 'user-1', callback1);
-					store.onKeyed('users:updated', 'user-2', callback2);
-					store.onKeyed('users:updated', 'user-3', callback3); // Not in original, but subscribed
+					store.onKey('users:updated', 'user-1', callback1);
+					store.onKey('users:updated', 'user-2', callback2);
+					store.onKey('users:updated', 'user-3', callback3); // Not in original, but subscribed
 
 					store.update((s) => {
 						s.users = {'user-3': {name: 'Bob'}}; // Full replacement with different keys
@@ -1097,7 +1098,7 @@ describe('ObservableStore', () => {
 					expect(callback3).toHaveBeenCalledTimes(1);
 				});
 
-				it('does NOT emit keyed events for array field when replaced (arrays without getItemId skip keyed events)', () => {
+				it('throws when using onItemId for array field without getItemId (arrays without getItemId cannot use keyed events)', () => {
 					type State = {todos: Array<{text: string; done: boolean}>};
 					const store = createObservableStore<State>({
 						todos: [
@@ -1106,18 +1107,10 @@ describe('ObservableStore', () => {
 						],
 					});
 
-					const callback0 = vi.fn();
-					const callback1 = vi.fn();
-					store.onKeyed('todos:updated', 0, callback0);
-					store.onKeyed('todos:updated', 1, callback1);
-
-					store.update((s) => {
-						s.todos = [{text: 'New Task', done: true}]; // Full replacement
-					});
-
-					// Arrays without getItemId do not emit keyed events
-					expect(callback0).not.toHaveBeenCalled();
-					expect(callback1).not.toHaveBeenCalled();
+					// onItemId throws when getItemId is not configured
+					expect(() => {
+						store.onItemId('todos:updated', 0, vi.fn());
+					}).toThrow("onItemId requires getItemId configuration for field 'todos'");
 				});
 
 				it('does not double-emit for keys that are both registered and in patches', () => {
@@ -1127,7 +1120,7 @@ describe('ObservableStore', () => {
 					});
 
 					const callback = vi.fn();
-					store.onKeyed('users:updated', 'user-1', callback);
+					store.onKey('users:updated', 'user-1', callback);
 
 					// This update will replace the users field AND user-1 is a key in the patch
 					// We use a Set for changedKeys, so it should only fire once
@@ -1564,7 +1557,7 @@ describe('ObservableStore', () => {
 			});
 
 			const callback = vi.fn();
-			store.keyedSubscriptions.users('user-1')(callback);
+			store.keySubscriptions.users('user-1')(callback);
 
 			// Callback should be called immediately with current value
 			expect(callback).toHaveBeenCalledTimes(1);
@@ -1586,7 +1579,7 @@ describe('ObservableStore', () => {
 			});
 
 			const callback = vi.fn();
-			store.keyedSubscriptions.users('user-1')(callback);
+			store.keySubscriptions.users('user-1')(callback);
 
 			// Reset after initial call
 			callback.mockClear();
@@ -1616,7 +1609,7 @@ describe('ObservableStore', () => {
 			});
 
 			const callback = vi.fn();
-			store.keyedSubscriptions.users('user-1')(callback);
+			store.keySubscriptions.users('user-1')(callback);
 
 			// Reset after initial call
 			callback.mockClear();
@@ -1640,7 +1633,7 @@ describe('ObservableStore', () => {
 			});
 
 			const callback = vi.fn();
-			const unsubscribe = store.keyedSubscriptions.users('user-1')(callback);
+			const unsubscribe = store.keySubscriptions.users('user-1')(callback);
 
 			expect(typeof unsubscribe).toBe('function');
 		});
@@ -1655,7 +1648,7 @@ describe('ObservableStore', () => {
 			});
 
 			const callback = vi.fn();
-			const unsubscribe = store.keyedSubscriptions.users('user-1')(callback);
+			const unsubscribe = store.keySubscriptions.users('user-1')(callback);
 
 			// Reset after initial call
 			callback.mockClear();
@@ -1688,8 +1681,8 @@ describe('ObservableStore', () => {
 			const callback1 = vi.fn();
 			const callback2 = vi.fn();
 
-			store.keyedSubscriptions.users('user-1')(callback1);
-			store.keyedSubscriptions.users('user-1')(callback2);
+			store.keySubscriptions.users('user-1')(callback1);
+			store.keySubscriptions.users('user-1')(callback2);
 
 			// Reset after initial calls
 			callback1.mockClear();
@@ -1720,7 +1713,7 @@ describe('ObservableStore', () => {
 
 			const callback = vi.fn();
 			// Now use item ID instead of index
-			store.keyedSubscriptions.todos(1)(callback);
+			store.itemIdSubscriptions.todos(1)(callback);
 
 			// Reset after initial call
 			callback.mockClear();
@@ -1752,8 +1745,8 @@ describe('ObservableStore', () => {
 			const callback1 = vi.fn();
 			const callback2 = vi.fn();
 
-			store.keyedSubscriptions.users('user-1')(callback1);
-			store.keyedSubscriptions.users('user-2')(callback2);
+			store.keySubscriptions.users('user-1')(callback1);
+			store.keySubscriptions.users('user-2')(callback2);
 
 			// Reset after initial calls
 			callback1.mockClear();
@@ -1786,7 +1779,7 @@ describe('ObservableStore', () => {
 			});
 
 			const callback = vi.fn();
-			store.keyedSubscriptions.users('user-1')(callback);
+			store.keySubscriptions.users('user-1')(callback);
 
 			// Reset after initial call
 			callback.mockClear();
@@ -2186,7 +2179,7 @@ describe('ObservableStore', () => {
 				expect(patches.length).toBeGreaterThan(0);
 			});
 
-			it('should NOT emit keyed events for arrays without getItemId', () => {
+			it('should throw when using onItemId for arrays without getItemId', () => {
 				type State = {
 					items: Array<{id: number; text: string}>;
 				};
@@ -2199,22 +2192,10 @@ describe('ObservableStore', () => {
 					],
 				});
 
-				const callback0 = vi.fn();
-				const callback1 = vi.fn();
-				const callback2 = vi.fn();
-
-				store.onKeyed('items:updated', 0, callback0);
-				store.onKeyed('items:updated', 1, callback1);
-				store.onKeyed('items:updated', 2, callback2);
-
-				store.update((state) => {
-					state.items.splice(0, 1); // Remove first element
-				});
-
-				// Arrays without getItemId do not emit keyed events
-				expect(callback0).not.toHaveBeenCalled();
-				expect(callback1).not.toHaveBeenCalled();
-				expect(callback2).not.toHaveBeenCalled();
+				// onItemId throws when getItemId is not configured
+				expect(() => {
+					store.onItemId('items:updated', 0, vi.fn());
+				}).toThrow("onItemId requires getItemId configuration for field 'items'");
 			});
 
 			it('should handle removing multiple elements at once', () => {
@@ -2393,7 +2374,7 @@ describe('ObservableStore', () => {
 				expect(callback).toHaveBeenCalledTimes(1);
 			});
 
-			it('should NOT emit keyed events when elements are reordered (arrays without getItemId)', () => {
+			it('should throw when using onItemId for arrays without getItemId (reorder example)', () => {
 				type State = {
 					items: Array<{id: number; text: string}>;
 				};
@@ -2406,25 +2387,10 @@ describe('ObservableStore', () => {
 					],
 				});
 
-				const callback0 = vi.fn();
-				const callback1 = vi.fn();
-				const callback2 = vi.fn();
-
-				store.onKeyed('items:updated', 0, callback0);
-				store.onKeyed('items:updated', 1, callback1);
-				store.onKeyed('items:updated', 2, callback2);
-
-				store.update((state) => {
-					// Swap first and last elements
-					const temp = state.items[0];
-					state.items[0] = state.items[2];
-					state.items[2] = temp;
-				});
-
-				// Arrays without getItemId do not emit keyed events
-				expect(callback0).not.toHaveBeenCalled();
-				expect(callback1).not.toHaveBeenCalled();
-				expect(callback2).not.toHaveBeenCalled();
+				// onItemId throws when getItemId is not configured
+				expect(() => {
+					store.onItemId('items:updated', 0, vi.fn());
+				}).toThrow("onItemId requires getItemId configuration for field 'items'");
 			});
 
 			it('should handle move item to end pattern', () => {
@@ -2682,31 +2648,7 @@ describe('ObservableStore', () => {
 			});
 		});
 
-		describe('Keyed events for array operations (arrays without getItemId skip keyed events)', () => {
-			it('should NOT emit keyed event for index when pushed (arrays without getItemId)', () => {
-				type State = {
-					items: Array<{id: number; text: string}>;
-				};
-
-				const store = createObservableStore<State>({
-					items: [
-						{id: 1, text: 'First'},
-						{id: 2, text: 'Second'},
-					],
-				});
-
-				const callback2 = vi.fn();
-				store.onKeyed('items:updated', 2, callback2);
-
-				// Push a new element (will be at index 2)
-				store.update((state) => {
-					state.items.push({id: 3, text: 'Third'});
-				});
-
-				// Arrays without getItemId do not emit keyed events
-				expect(callback2).not.toHaveBeenCalled();
-			});
-
+		describe('Array operations without getItemId (use field-level subscriptions)', () => {
 			it('should verify patches contain correct operations for push', () => {
 				type State = {
 					items: Array<{id: number; text: string}>;
@@ -2773,110 +2715,9 @@ describe('ObservableStore', () => {
 				]);
 			});
 
-			it('should NOT emit keyed events when using splice to remove (arrays without getItemId)', () => {
-				// splice generates patches differently - it replaces elements
-				type State = {
-					items: Array<{id: number; text: string}>;
-				};
-
-				const store = createObservableStore<State>({
-					items: [
-						{id: 1, text: 'First'},
-						{id: 2, text: 'Second'},
-						{id: 3, text: 'Third'},
-					],
-				});
-
-				const callback0 = vi.fn();
-				const callback1 = vi.fn();
-
-				store.onKeyed('items:updated', 0, callback0);
-				store.onKeyed('items:updated', 1, callback1);
-
-				// Splice removes first element, shifting others
-				store.update((state) => {
-					state.items.splice(0, 1);
-				});
-
-				// Arrays without getItemId do not emit keyed events
-				expect(callback0).not.toHaveBeenCalled();
-				expect(callback1).not.toHaveBeenCalled();
-				// Array should be correctly updated
-				expect(store.get('items')).toEqual([
-					{id: 2, text: 'Second'},
-					{id: 3, text: 'Third'},
-				]);
-			});
-
-			it('should NOT emit keyed events for replacement at specific index (arrays without getItemId)', () => {
-				type State = {
-					items: Array<{id: number; text: string}>;
-				};
-
-				const store = createObservableStore<State>({
-					items: [
-						{id: 1, text: 'First'},
-						{id: 2, text: 'Second'},
-						{id: 3, text: 'Third'},
-					],
-				});
-
-				const callback1 = vi.fn();
-				store.onKeyed('items:updated', 1, callback1);
-
-				// Replace item at index 1
-				store.update((state) => {
-					state.items[1] = {id: 99, text: 'Replaced'};
-				});
-
-				// Arrays without getItemId do not emit keyed events
-				expect(callback1).not.toHaveBeenCalled();
-				expect(store.get('items')[1]).toEqual({id: 99, text: 'Replaced'});
-			});
-
-			it('should NOT handle push cycles with keyed listener (arrays without getItemId)', () => {
-				type State = {
-					items: Array<{id: number; text: string}>;
-				};
-
-				const store = createObservableStore<State>({
-					items: [{id: 1, text: 'First'}],
-				});
-
-				const callback1 = vi.fn();
-				store.onKeyed('items:updated', 1, callback1);
-
-				// First push - creates index 1
-				store.update((state) => {
-					state.items.push({id: 2, text: 'Second'});
-				});
-				// Arrays without getItemId do not emit keyed events
-				expect(callback1).not.toHaveBeenCalled();
-
-				// Modify index 1
-				store.update((state) => {
-					state.items[1].text = 'Modified Second';
-				});
-				expect(callback1).not.toHaveBeenCalled();
-
-				// Replace index 1
-				store.update((state) => {
-					state.items[1] = {id: 3, text: 'Third'};
-				});
-				expect(callback1).not.toHaveBeenCalled();
-
-				// Verify final state
-				expect(store.get('items')).toEqual([
-					{id: 1, text: 'First'},
-					{id: 3, text: 'Third'},
-				]);
-			});
-
-			it('should prefer field-level subscriptions for arrays over keyed indices', () => {
-				// This test documents the recommended pattern for array subscriptions.
-				// Since array indices represent positions (not identities), use:
-				// - Field-level subscriptions (items:updated) for the whole array
-				// - Item IDs as keys in UI frameworks (not indices)
+			it('should use field-level subscriptions for arrays without getItemId', () => {
+				// For arrays without getItemId, use field-level subscriptions.
+				// onItemId requires getItemId configuration.
 				type State = {
 					items: Array<{id: number; text: string}>;
 				};
@@ -2913,12 +2754,12 @@ describe('ObservableStore', () => {
 				});
 				expect(fieldCallback).toHaveBeenCalledTimes(4);
 
-				// Field-level subscription is the reliable pattern for arrays
+				// Field-level subscription is the reliable pattern for arrays without getItemId
 			});
 		});
 
-		describe('Array removal keyed events (arrays without getItemId skip keyed events)', () => {
-			it('should NOT emit keyed events for removed indices on pop (arrays without getItemId)', () => {
+		describe('onItemId requires getItemId configuration', () => {
+			it('should throw error when onItemId is used without getItemId config', () => {
 				type State = {
 					items: Array<{id: number}>;
 				};
@@ -2927,45 +2768,12 @@ describe('ObservableStore', () => {
 					items: [{id: 1}, {id: 2}, {id: 3}],
 				});
 
-				const callback2 = vi.fn();
-				store.onKeyed('items:updated', 2, callback2);
-
-				store.update((s) => s.items.pop());
-
-				// Arrays without getItemId do not emit keyed events
-				expect(callback2).not.toHaveBeenCalled();
+				expect(() => {
+					store.onItemId('items:updated', 2, vi.fn());
+				}).toThrow("onItemId requires getItemId configuration for field 'items'");
 			});
 
-			it('should NOT emit keyed events for all removed indices on bulk removal (arrays without getItemId)', () => {
-				type State = {
-					items: Array<{id: number}>;
-				};
-
-				const store = createObservableStore<State>({
-					items: [{id: 1}, {id: 2}, {id: 3}, {id: 4}, {id: 5}],
-				});
-
-				const callback2 = vi.fn();
-				const callback3 = vi.fn();
-				const callback4 = vi.fn();
-
-				store.onKeyed('items:updated', 2, callback2);
-				store.onKeyed('items:updated', 3, callback3);
-				store.onKeyed('items:updated', 4, callback4);
-
-				store.update((s) => {
-					s.items.length = 2;
-				});
-
-				// Arrays without getItemId do not emit keyed events
-				expect(callback2).not.toHaveBeenCalled();
-				expect(callback3).not.toHaveBeenCalled();
-				expect(callback4).not.toHaveBeenCalled();
-			});
-
-			it('should NOT emit keyed events on shift for removed index (arrays without getItemId)', () => {
-				// Note: shift generates a 'remove' operation at index 0
-				// It does NOT generate patches for indices that shifted
+			it('should throw error when onItemId with wildcard is used without getItemId config', () => {
 				type State = {
 					items: Array<{id: number}>;
 				};
@@ -2974,60 +2782,23 @@ describe('ObservableStore', () => {
 					items: [{id: 1}, {id: 2}, {id: 3}],
 				});
 
-				const callback0 = vi.fn();
-
-				store.onKeyed('items:updated', 0, callback0);
-
-				store.update((s) => s.items.shift());
-
-				// Arrays without getItemId do not emit keyed events
-				expect(callback0).not.toHaveBeenCalled();
+				expect(() => {
+					store.onItemId('items:updated', '*', vi.fn());
+				}).toThrow("onItemId requires getItemId configuration for field 'items'");
 			});
 
-			it('should NOT emit keyed events on splice for removed indices (arrays without getItemId)', () => {
-				// Note: splice(1, 2) removes elements at indices 1 and 2
-				// patch-recorder generates remove operations for those exact indices
+			it('should throw error when onceItemId is used without getItemId config', () => {
 				type State = {
 					items: Array<{id: number}>;
 				};
 
 				const store = createObservableStore<State>({
-					items: [{id: 1}, {id: 2}, {id: 3}, {id: 4}],
+					items: [{id: 1}, {id: 2}, {id: 3}],
 				});
 
-				const callback1 = vi.fn();
-				const callback2 = vi.fn();
-
-				store.onKeyed('items:updated', 1, callback1);
-				store.onKeyed('items:updated', 2, callback2);
-
-				// Remove 2 elements starting at index 1
-				store.update((s) => s.items.splice(1, 2));
-
-				// Arrays without getItemId do not emit keyed events
-				expect(callback1).not.toHaveBeenCalled();
-				expect(callback2).not.toHaveBeenCalled();
-			});
-
-			it('should NOT emit keyed events on multiple pops (arrays without getItemId)', () => {
-				type State = {
-					items: Array<{id: number}>;
-				};
-
-				const store = createObservableStore<State>({
-					items: [{id: 1}, {id: 2}, {id: 3}, {id: 4}, {id: 5}],
-				});
-
-				const callback2 = vi.fn();
-				store.onKeyed('items:updated', 2, callback2);
-
-				// Pop 3 times
-				store.update((s) => s.items.pop()); // Removes index 4
-				store.update((s) => s.items.pop()); // Removes index 3
-				store.update((s) => s.items.pop()); // Removes index 2
-
-				// Arrays without getItemId do not emit keyed events
-				expect(callback2).not.toHaveBeenCalled();
+				expect(() => {
+					store.onceItemId('items:updated', 2, vi.fn());
+				}).toThrow("onceItemId requires getItemId configuration for field 'items'");
 			});
 
 			it('should not emit keyed events when no keyed listeners exist (performance)', () => {
@@ -3048,51 +2819,6 @@ describe('ObservableStore', () => {
 				// Only field callback fires
 				expect(fieldCallback).toHaveBeenCalledTimes(1);
 			});
-
-			it('should NOT work with wildcard keyed listeners for removal (arrays without getItemId)', () => {
-				type State = {
-					items: Array<{id: number}>;
-				};
-
-				const store = createObservableStore<State>({
-					items: [{id: 1}, {id: 2}, {id: 3}],
-				});
-
-				const wildcardCallback = vi.fn();
-				store.onKeyed('items:updated', '*', wildcardCallback);
-
-				store.update((s) => s.items.pop());
-
-				// Arrays without getItemId do not emit keyed events
-				expect(wildcardCallback).not.toHaveBeenCalled();
-			});
-
-			it('should NOT handle removing all elements with keyed events (arrays without getItemId)', () => {
-				type State = {
-					items: Array<{id: number}>;
-				};
-
-				const store = createObservableStore<State>({
-					items: [{id: 1}, {id: 2}, {id: 3}],
-				});
-
-				const callback0 = vi.fn();
-				const callback1 = vi.fn();
-				const callback2 = vi.fn();
-
-				store.onKeyed('items:updated', 0, callback0);
-				store.onKeyed('items:updated', 1, callback1);
-				store.onKeyed('items:updated', 2, callback2);
-
-				store.update((s) => {
-					s.items.length = 0;
-				});
-
-				// Arrays without getItemId do not emit keyed events
-				expect(callback0).not.toHaveBeenCalled();
-				expect(callback1).not.toHaveBeenCalled();
-				expect(callback2).not.toHaveBeenCalled();
-			});
 		});
 
 		describe('ID-based keyed events for arrays (with getItemId)', () => {
@@ -3110,7 +2836,7 @@ describe('ObservableStore', () => {
 				);
 
 				const callback = vi.fn();
-				store.onKeyed('items:updated', 'a', callback);
+				store.onItemId('items:updated', 'a', callback);
 
 				store.update((s) => {
 					s.items[0].value = 10;
@@ -3133,7 +2859,7 @@ describe('ObservableStore', () => {
 				);
 
 				const callbackA = vi.fn();
-				store.onKeyed('items:updated', 'a', callbackA);
+				store.onItemId('items:updated', 'a', callbackA);
 
 				// Reorder: move 'b' to first position
 				store.update((s) => {
@@ -3150,20 +2876,16 @@ describe('ObservableStore', () => {
 				expect(callbackA).toHaveBeenCalled();
 			});
 
-			it('should not emit keyed events for arrays without getItemId', () => {
+			it('should throw error when using onItemId for arrays without getItemId', () => {
 				type State = {items: number[]};
 
 				const store = createObservableStore<State>({items: [1, 2, 3]});
 				// No getItemId configured
 
-				const callback = vi.fn();
-				store.onKeyed('items:updated', 0, callback); // Should have no effect
-
-				store.update((s) => {
-					s.items[0] = 10;
-				});
-
-				expect(callback).not.toHaveBeenCalled();
+				// onItemId should throw when getItemId is not configured
+				expect(() => {
+					store.onItemId('items:updated', 0, vi.fn());
+				}).toThrow("onItemId requires getItemId configuration for field 'items'");
 			});
 
 			it('should continue to emit keyed events for Records using key', () => {
@@ -3174,7 +2896,7 @@ describe('ObservableStore', () => {
 				});
 
 				const callback = vi.fn();
-				store.onKeyed('users:updated', 'u1', callback);
+				store.onKey('users:updated', 'u1', callback);
 
 				store.update((s) => {
 					s.users['u1'].name = 'Bob';
@@ -3197,7 +2919,7 @@ describe('ObservableStore', () => {
 				);
 
 				const callbackA = vi.fn();
-				store.onKeyed('items:updated', 'a', callbackA);
+				store.onItemId('items:updated', 'a', callbackA);
 
 				store.update((s) => {
 					s.items.shift();
@@ -3226,8 +2948,8 @@ describe('ObservableStore', () => {
 
 				const callbackA = vi.fn();
 				const callbackC = vi.fn();
-				store.onKeyed('items:updated', 'a', callbackA);
-				store.onKeyed('items:updated', 'c', callbackC);
+				store.onItemId('items:updated', 'a', callbackA);
+				store.onItemId('items:updated', 'c', callbackC);
 
 				// Replace item at index 0 (id: 'a') with new item (id: 'c')
 				store.update((s) => {
@@ -3248,7 +2970,7 @@ describe('ObservableStore', () => {
 				);
 
 				const callbackA = vi.fn();
-				store.onKeyed('items:updated', 'a', callbackA);
+				store.onItemId('items:updated', 'a', callbackA);
 
 				// Replace entire array
 				store.update((s) => {
@@ -3273,7 +2995,7 @@ describe('ObservableStore', () => {
 				);
 
 				const wildcardCallback = vi.fn();
-				store.onKeyed('items:updated', '*', wildcardCallback);
+				store.onItemId('items:updated', '*', wildcardCallback);
 
 				store.update((s) => {
 					s.items[0].value = 100;
@@ -3315,7 +3037,7 @@ describe('ObservableStore', () => {
 				);
 
 				const callback = vi.fn();
-				store.onKeyed('items:updated', 1, callback);
+				store.onItemId('items:updated', 1, callback);
 
 				store.update((s) => {
 					s.items[0].value = 'updated';
@@ -3324,13 +3046,13 @@ describe('ObservableStore', () => {
 				expect(callback).toHaveBeenCalledTimes(1);
 			});
 
-			it('should not create keyed subscriptions for arrays without getItemId in keyedSubscriptions', () => {
+			it('should not create keyed subscriptions for arrays without getItemId in itemIdSubscriptions', () => {
 				type State = {items: number[]};
 
 				const store = createObservableStore<State>({items: [1, 2, 3]});
 
-				// keyedSubscriptions for array fields without getItemId should not exist
-				expect(store.keyedSubscriptions.items).toBeUndefined();
+				// itemIdSubscriptions for array fields without getItemId should not exist
+				expect(store.itemIdSubscriptions.items).toBeUndefined();
 			});
 
 			it('should create keyed subscriptions for arrays with getItemId', () => {
@@ -3341,8 +3063,8 @@ describe('ObservableStore', () => {
 					{getItemId: {items: (item) => item.id}},
 				);
 
-				// keyedSubscriptions should exist for this field
-				expect(store.keyedSubscriptions.items).toBeDefined();
+				// itemIdSubscriptions should exist for this field
+				expect(store.itemIdSubscriptions.items).toBeDefined();
 			});
 		});
 
@@ -3356,7 +3078,7 @@ describe('ObservableStore', () => {
 				);
 
 				const wildcardCallback = vi.fn();
-				store.onKeyed('items:updated', '*', wildcardCallback);
+				store.onItemId('items:updated', '*', wildcardCallback);
 
 				// Update item without ID
 				store.update((s) => {
@@ -3381,7 +3103,7 @@ describe('ObservableStore', () => {
 				);
 
 				const wildcardCallback = vi.fn();
-				store.onKeyed('items:updated', '*', wildcardCallback);
+				store.onItemId('items:updated', '*', wildcardCallback);
 
 				// Update item with null ID
 				store.update((s) => {
@@ -3402,8 +3124,8 @@ describe('ObservableStore', () => {
 
 				const callbackB = vi.fn();
 				const wildcardCallback = vi.fn();
-				store.onKeyed('items:updated', 'b', callbackB);
-				store.onKeyed('items:updated', '*', wildcardCallback);
+				store.onItemId('items:updated', 'b', callbackB);
+				store.onItemId('items:updated', '*', wildcardCallback);
 
 				// Update item with valid ID
 				store.update((s) => {
@@ -3445,7 +3167,7 @@ describe('ObservableStore', () => {
 
 				const wildcardCallback = vi.fn();
 				const fieldCallback = vi.fn();
-				store.onKeyed('items:updated', '*', wildcardCallback);
+				store.onItemId('items:updated', '*', wildcardCallback);
 				store.on('items:updated', fieldCallback);
 
 				// Push item without ID
@@ -3477,7 +3199,7 @@ describe('ObservableStore', () => {
 				);
 
 				const wildcardCallback = vi.fn();
-				store.onKeyed('items:updated', '*', wildcardCallback);
+				store.onItemId('items:updated', '*', wildcardCallback);
 
 				// This should throw because getItemId throws
 				expect(() => {
@@ -3535,7 +3257,7 @@ describe('ObservableStore', () => {
 
 				const wildcardCallback = vi.fn();
 				const fieldCallback = vi.fn();
-				store.onKeyed('items:updated', '*', wildcardCallback);
+				store.onItemId('items:updated', '*', wildcardCallback);
 				store.on('items:updated', fieldCallback);
 
 				// Push first item
@@ -3564,7 +3286,7 @@ describe('ObservableStore', () => {
 				});
 
 				const callbackA = vi.fn();
-				store.onKeyed('items:updated', 'a', callbackA);
+				store.onItemId('items:updated', 'a', callbackA);
 
 				// Now update the item
 				store.update((s) => {
@@ -3589,7 +3311,7 @@ describe('ObservableStore', () => {
 				);
 
 				const callback0 = vi.fn();
-				store.onKeyed('items:updated', 0, callback0);
+				store.onItemId('items:updated', 0, callback0);
 
 				// Update item with ID 0
 				store.update((s) => {
@@ -3614,7 +3336,7 @@ describe('ObservableStore', () => {
 				);
 
 				const callbackEmpty = vi.fn();
-				store.onKeyed('items:updated', '', callbackEmpty);
+				store.onItemId('items:updated', '', callbackEmpty);
 
 				// Update item with empty string ID
 				store.update((s) => {
@@ -3625,5 +3347,205 @@ describe('ObservableStore', () => {
 				expect(callbackEmpty).toHaveBeenCalledTimes(1);
 			});
 		});
+	});
+});
+
+// Test to document behavioral difference between Records and Arrays for onKey/onItemId
+describe('onKey vs onItemId behavioral difference: Records vs Arrays', () => {
+	it('Record: onKey FIRES when key is deleted', () => {
+		type State = {items: Record<string, {value: number}>};
+		const store = createObservableStore<State>({
+			items: {a: {value: 1}, b: {value: 2}},
+		});
+
+		const callbackA = vi.fn();
+		const callbackB = vi.fn();
+		store.onKey('items:updated', 'a', callbackA);
+		store.onKey('items:updated', 'b', callbackB);
+
+		// Delete key 'a'
+		store.update((s) => {
+			delete s.items.a;
+		});
+
+		// callbackA FIRES for Record deletion
+		expect(callbackA).toHaveBeenCalledTimes(1);
+		expect(callbackB).not.toHaveBeenCalled();
+	});
+
+	it('Array with getItemId: onItemId does NOT fire when item is removed', () => {
+		type State = {items: Array<{id: string; value: number}>};
+		const store = createObservableStore<State>(
+			{
+				items: [
+					{id: 'a', value: 1},
+					{id: 'b', value: 2},
+				],
+			},
+			{getItemId: {items: (item) => item.id}},
+		);
+
+		const callbackA = vi.fn();
+		const callbackB = vi.fn();
+		store.onItemId('items:updated', 'a', callbackA);
+		store.onItemId('items:updated', 'b', callbackB);
+
+		// Remove item 'a' via shift
+		store.update((s) => {
+			s.items.shift();
+		});
+
+		// callbackA does NOT fire for Array removal (patch-recorder doesn't include patch.id for removals)
+		expect(callbackA).not.toHaveBeenCalled();
+		expect(callbackB).not.toHaveBeenCalled();
+	});
+});
+
+// Type safety tests for onKey and onItemId API
+describe('Type Safety: onKey and onItemId', () => {
+	it('onKey should only accept Record field names (not Array fields)', () => {
+		type State = {
+			users: Record<string, {name: string}>;
+			items: Array<{id: string; value: number}>;
+			counter: number;
+		};
+
+		const store = createObservableStore<State>(
+			{
+				users: {a: {name: 'Alice'}},
+				items: [{id: '1', value: 10}],
+				counter: 0,
+			},
+			{getItemId: {items: (item) => item.id}},
+		);
+
+		// Valid: onKey with Record field
+		const cb = vi.fn();
+		store.onKey('users:updated', 'a', cb);
+
+		// @ts-expect-error - onKey should not accept Array fields
+		store.onKey('items:updated', '1', vi.fn());
+
+		// @ts-expect-error - onKey should not accept Primitive fields
+		store.onKey('counter:updated', '1', vi.fn());
+	});
+
+	it('onItemId throws at runtime when used with Record fields (no getItemId configured)', () => {
+		type State = {
+			users: Record<string, {name: string}>;
+			items: Array<{id: string; value: number}>;
+			counter: number;
+		};
+
+		const store = createObservableStore<State>(
+			{
+				users: {a: {name: 'Alice'}},
+				items: [{id: '1', value: 10}],
+				counter: 0,
+			},
+			{getItemId: {items: (item) => item.id}},
+		);
+
+		// Valid: onItemId with Array field that has getItemId
+		const cb = vi.fn();
+		store.onItemId('items:updated', '1', cb);
+
+		// Runtime error: onItemId throws when getItemId is not configured for the field
+		// @ts-expect-error - onItemId should not accept Record fields at the type level
+		expect(() => store.onItemId('users:updated', 'a', vi.fn())).toThrow(
+			"onItemId requires getItemId configuration for field 'users'",
+		);
+	});
+
+	it('offKey should only accept Record field names', () => {
+		type State = {
+			users: Record<string, {name: string}>;
+			items: Array<{id: string; value: number}>;
+		};
+
+		const store = createObservableStore<State>(
+			{
+				users: {a: {name: 'Alice'}},
+				items: [{id: '1', value: 10}],
+			},
+			{getItemId: {items: (item) => item.id}},
+		);
+
+		// Valid: offKey with Record field
+		const cb = vi.fn();
+		store.onKey('users:updated', 'a', cb);
+		store.offKey('users:updated', 'a', cb);
+
+		// @ts-expect-error - offKey should not accept Array fields
+		store.offKey('items:updated', '1', vi.fn());
+	});
+
+	it('offItemId should only accept Array field names', () => {
+		type State = {
+			users: Record<string, {name: string}>;
+			items: Array<{id: string; value: number}>;
+		};
+
+		const store = createObservableStore<State>(
+			{
+				users: {a: {name: 'Alice'}},
+				items: [{id: '1', value: 10}],
+			},
+			{getItemId: {items: (item) => item.id}},
+		);
+
+		// Valid: offItemId with Array field
+		const cb = vi.fn();
+		store.onItemId('items:updated', '1', cb);
+		store.offItemId('items:updated', '1', cb);
+
+		// Note: offItemId doesn't throw at runtime for Record fields (it's a no-op),
+		// but ideally TypeScript should reject this at compile time.
+		// TODO: Improve type safety to prevent this at compile time
+	});
+
+	it('onceKey should only accept Record field names', () => {
+		type State = {
+			users: Record<string, {name: string}>;
+			items: Array<{id: string; value: number}>;
+		};
+
+		const store = createObservableStore<State>(
+			{
+				users: {a: {name: 'Alice'}},
+				items: [{id: '1', value: 10}],
+			},
+			{getItemId: {items: (item) => item.id}},
+		);
+
+		// Valid: onceKey with Record field
+		store.onceKey('users:updated', 'a', vi.fn());
+
+		// @ts-expect-error - onceKey should not accept Array fields
+		store.onceKey('items:updated', '1', vi.fn());
+	});
+
+	it('onceItemId throws at runtime when used with Record fields', () => {
+		type State = {
+			users: Record<string, {name: string}>;
+			items: Array<{id: string; value: number}>;
+		};
+
+		const store = createObservableStore<State>(
+			{
+				users: {a: {name: 'Alice'}},
+				items: [{id: '1', value: 10}],
+			},
+			{getItemId: {items: (item) => item.id}},
+		);
+
+		// Valid: onceItemId with Array field
+		store.onceItemId('items:updated', '1', vi.fn());
+
+		// Runtime error: onceItemId throws when getItemId is not configured for the field
+		// @ts-expect-error - onceItemId should not accept Record fields at the type level
+		expect(() => store.onceItemId('users:updated', 'a', vi.fn())).toThrow(
+			"onceItemId requires getItemId configuration for field 'users'",
+		);
 	});
 });

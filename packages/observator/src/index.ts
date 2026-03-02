@@ -4,9 +4,14 @@ import {
 	EventName,
 	EventNames,
 	ExtractKeyType,
+	ExtractRecordFields,
+	ExtractArrayFields,
+	ExtractRecordKeyType,
+	ExtractItemIdType,
 	Key,
 	KeyedObservableEventMap,
-	KeyedSubscriptionsMap,
+	KeySubscriptionsMap,
+	ItemIdSubscriptionsMap,
 	NonPrimitive,
 	Patches,
 	SubscriptionsMap,
@@ -20,9 +25,14 @@ export type {
 	EventName,
 	EventNames,
 	ExtractKeyType,
+	ExtractRecordFields,
+	ExtractArrayFields,
+	ExtractRecordKeyType,
+	ExtractItemIdType,
 	Key,
 	KeyedObservableEventMap,
-	KeyedSubscriptionsMap,
+	KeySubscriptionsMap,
+	ItemIdSubscriptionsMap,
 	NonPrimitive,
 	Patches,
 	Patch,
@@ -92,7 +102,8 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	private emitter: Emitter<any, any>;
 
 	public subscriptions: SubscriptionsMap<T>;
-	public keyedSubscriptions: KeyedSubscriptionsMap<T>;
+	public keySubscriptions: KeySubscriptionsMap<T>;
+	public itemIdSubscriptions: ItemIdSubscriptionsMap<T>;
 
 	private create: CreateFunction;
 
@@ -109,7 +120,8 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 		this.emitter = createEmitter();
 		this.arrayFields = this.detectArrayFields();
 		this.subscriptions = this.createSubscribeHandlers();
-		this.keyedSubscriptions = this.createKeyedSubscribeHandlers();
+		this.keySubscriptions = this.createKeySubscribeHandlers();
+		this.itemIdSubscriptions = this.createItemIdSubscribeHandlers();
 	}
 
 	/**
@@ -286,34 +298,41 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 		return this.emitter.once(event, callback);
 	}
 
+	// ========================================================================
+	// onKey / offKey / onceKey - For Record fields only
+	// ========================================================================
+
 	/**
-	 * Subscribe to updates for a specific field with a specific key
+	 * Subscribe to updates for a specific key in a Record field.
 	 *
-	 * @param event - The event name in format `${fieldName}:updated`
-	 * @param key - The specific key to listen for (e.g., user ID, array index)
+	 * NOTE: This method is for Record fields only. For arrays, use `onItemId`.
+	 * Fires when: key is updated, key is deleted, or the entire field is replaced.
+	 *
+	 * @param event - Record field event name in format `${fieldName}:updated`
+	 * @param key - The specific Record key to listen for
 	 * @param callback - Callback function that receives the patches array
 	 * @returns Unsubscribe function
 	 *
 	 * @example
 	 * ```ts
-	 * // Subscribe to specific user changes
-	 * const unsubscribe = store.onKeyed('users:updated', 'user-123', (patches) => {
+	 * // Subscribe to specific user changes in a Record
+	 * const unsubscribe = store.onKey('users:updated', 'user-123', (patches) => {
 	 *   console.log('User 123 changed:', patches);
 	 * });
 	 *
 	 * // Later: unsubscribe();
 	 * ```
 	 */
-	public onKeyed<K extends keyof T>(
+	public onKey<K extends ExtractRecordFields<T>>(
 		event: EventName<K & string>,
 		key: Key,
 		callback: (patches: Patches) => void,
 	): () => void;
 
 	/**
-	 * Subscribe to all keys in a field (wildcard subscription)
+	 * Subscribe to all keys in a Record field (wildcard subscription)
 	 *
-	 * @param event - The event name in format `${fieldName}:updated`
+	 * @param event - Record field event name in format `${fieldName}:updated`
 	 * @param key - Use '*' to listen to all keys
 	 * @param callback - Callback function that receives the key and patches array
 	 * @returns Unsubscribe function
@@ -321,26 +340,19 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 * @example
 	 * ```ts
 	 * // Subscribe to all user changes (userId is inferred as string)
-	 * const unsubscribe = store.onKeyed('users:updated', '*', (userId, patches) => {
+	 * const unsubscribe = store.onKey('users:updated', '*', (userId, patches) => {
 	 *   console.log(`User ${userId} changed:`, patches);
 	 * });
-	 *
-	 * // Subscribe to all todo changes (index is inferred as number)
-	 * const unsubscribe = store.onKeyed('todos:updated', '*', (index, patches) => {
-	 *   console.log(`Todo at index ${index} changed:`, patches);
-	 * });
-	 *
-	 * // Later: unsubscribe();
 	 * ```
 	 */
-	public onKeyed<K extends keyof T>(
+	public onKey<K extends ExtractRecordFields<T>>(
 		event: EventName<K & string>,
 		key: '*',
-		callback: (key: ExtractKeyType<T[K]>, patches: Patches) => void,
+		callback: (key: ExtractRecordKeyType<T[K]>, patches: Patches) => void,
 	): () => void;
 
 	/** @internal */
-	public onKeyed<K extends keyof T>(
+	public onKey<K extends ExtractRecordFields<T>>(
 		event: EventName<K & string>,
 		key: Key | '*',
 		callback: (...args: any[]) => void,
@@ -350,22 +362,22 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	}
 
 	/**
-	 * Unsubscribe from a keyed event
+	 * Unsubscribe from a Record field key event
 	 *
-	 * @param event - The event name in format `${fieldName}:updated`
+	 * @param event - Record field event name in format `${fieldName}:updated`
 	 * @param key - The specific key to unsubscribe from
 	 * @param callback - The exact callback function to remove
 	 *
 	 * @example
 	 * ```ts
 	 * const callback = (patches) => console.log('Changed:', patches);
-	 * store.onKeyed('users:updated', 'user-123', callback);
+	 * store.onKey('users:updated', 'user-123', callback);
 	 *
 	 * // Later:
-	 * store.offKeyed('users:updated', 'user-123', callback);
+	 * store.offKey('users:updated', 'user-123', callback);
 	 * ```
 	 */
-	public offKeyed<K extends keyof T>(
+	public offKey<K extends ExtractRecordFields<T>>(
 		event: EventName<K & string>,
 		key: Key,
 		callback: (patches: Patches) => void,
@@ -375,66 +387,216 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	}
 
 	/**
-	 * Subscribe to a keyed event for a single emission only
+	 * Subscribe to a Record field key event for a single emission only
 	 *
-	 * @param event - The event name in format `${fieldName}:updated`
+	 * @param event - Record field event name in format `${fieldName}:updated`
 	 * @param key - The specific key to listen for
 	 * @param callback - Callback function that receives the patches array
 	 * @returns Unsubscribe function to remove listener before it fires
 	 *
 	 * @example
 	 * ```ts
-	 * // Subscribe for single emission
-	 * const unsubscribe = store.onceKeyed('users:updated', 'user-123', (patches) => {
+	 * const unsubscribe = store.onceKey('users:updated', 'user-123', (patches) => {
 	 *   console.log('User 123 changed once:', patches);
 	 * });
-	 *
-	 * // Callback will fire once, then automatically unsubscribe
 	 * ```
 	 */
-	public onceKeyed<K extends keyof T>(
+	public onceKey<K extends ExtractRecordFields<T>>(
 		event: EventName<K & string>,
 		key: Key,
 		callback: (patches: Patches) => void,
 	): () => void;
 
 	/**
-	 * Subscribe to all keys in a field for a single emission only (wildcard)
+	 * Subscribe to all keys in a Record field for a single emission only (wildcard)
 	 *
-	 * @param event - The event name in format `${fieldName}:updated`
+	 * @param event - Record field event name in format `${fieldName}:updated`
 	 * @param key - Use '*' to listen to all keys
 	 * @param callback - Callback function that receives the key and patches array
 	 * @returns Unsubscribe function to remove listener before it fires
 	 *
 	 * @example
 	 * ```ts
-	 * // Subscribe for single emission to all users (userId is inferred as string)
-	 * const unsubscribe = store.onceKeyed('users:updated', '*', (userId, patches) => {
+	 * const unsubscribe = store.onceKey('users:updated', '*', (userId, patches) => {
 	 *   console.log(`User ${userId} changed once:`, patches);
 	 * });
-	 *
-	 * // Subscribe for single emission to all todos (index is inferred as number)
-	 * const unsubscribe = store.onceKeyed('todos:updated', '*', (index, patches) => {
-	 *   console.log(`Todo at index ${index} changed once:`, patches);
-	 * });
-	 *
-	 * // Callback will fire once, then automatically unsubscribe
 	 * ```
 	 */
-	public onceKeyed<K extends keyof T>(
+	public onceKey<K extends ExtractRecordFields<T>>(
 		event: EventName<K & string>,
 		key: '*',
-		callback: (key: ExtractKeyType<T[K]>, patches: Patches) => void,
+		callback: (key: ExtractRecordKeyType<T[K]>, patches: Patches) => void,
 	): () => void;
 
 	/** @internal */
-	public onceKeyed<K extends keyof T>(
+	public onceKey<K extends ExtractRecordFields<T>>(
 		event: EventName<K & string>,
 		key: Key | '*',
 		callback: (...args: any[]) => void,
 	): () => void {
 		// Type assertions needed due to TypeScript limitations with generic string literals
 		return this.emitter.onceKeyed(event as any, key as any, callback as any);
+	}
+
+	// ========================================================================
+	// onItemId / offItemId / onceItemId - For Array fields with getItemId only
+	// ========================================================================
+
+	/**
+	 * Subscribe to updates for a specific item ID in an Array field.
+	 *
+	 * NOTE: This method requires getItemId to be configured for the array field.
+	 * For Record fields, use `onKey` instead.
+	 *
+	 * IMPORTANT: This callback ONLY fires when the item's properties are updated,
+	 * NOT when the item is removed or the array is replaced. Use `on` for those cases.
+	 *
+	 * @param event - Array field event name in format `${fieldName}:updated`
+	 * @param itemId - The item ID to listen for (as returned by getItemId)
+	 * @param callback - Callback function that receives the patches array
+	 * @returns Unsubscribe function
+	 *
+	 * @example
+	 * ```ts
+	 * const store = createObservableStore(
+	 *   { todos: [{ id: 'todo-1', text: 'Hello' }] },
+	 *   { getItemId: { todos: item => item.id } }
+	 * );
+	 *
+	 * // Subscribe to specific todo item changes
+	 * const unsubscribe = store.onItemId('todos:updated', 'todo-1', (patches) => {
+	 *   console.log('Todo 1 updated:', patches);
+	 * });
+	 * ```
+	 */
+	public onItemId<K extends ExtractArrayFields<T>>(
+		event: EventName<K & string>,
+		itemId: string | number,
+		callback: (patches: Patches) => void,
+	): () => void;
+
+	/**
+	 * Subscribe to all item IDs in an Array field (wildcard subscription)
+	 *
+	 * @param event - Array field event name in format `${fieldName}:updated`
+	 * @param itemId - Use '*' to listen to all item IDs
+	 * @param callback - Callback function that receives the item ID and patches array
+	 * @returns Unsubscribe function
+	 *
+	 * @example
+	 * ```ts
+	 * const unsubscribe = store.onItemId('todos:updated', '*', (itemId, patches) => {
+	 *   console.log(`Todo ${itemId} updated:`, patches);
+	 * });
+	 * ```
+	 */
+	public onItemId<K extends ExtractArrayFields<T>>(
+		event: EventName<K & string>,
+		itemId: '*',
+		callback: (itemId: string | number, patches: Patches) => void,
+	): () => void;
+
+	/** @internal */
+	public onItemId<K extends ExtractArrayFields<T>>(
+		event: EventName<K & string>,
+		itemId: string | number | '*',
+		callback: (...args: any[]) => void,
+	): () => void {
+		// Validate that getItemId is configured for this array field
+		const fieldName = (event as string).replace(':updated', '');
+		if (!this.options?.getItemId?.[fieldName]) {
+			throw new Error(
+				`onItemId requires getItemId configuration for field '${fieldName}'. ` +
+					`Configure it when creating the store: createObservableStore(state, { getItemId: { ${fieldName}: item => item.id } })`,
+			);
+		}
+		// Type assertions needed due to TypeScript limitations with generic string literals
+		return this.emitter.onKeyed(event as any, itemId as any, callback as any);
+	}
+
+	/**
+	 * Unsubscribe from an Array field item ID event
+	 *
+	 * @param event - Array field event name in format `${fieldName}:updated`
+	 * @param itemId - The item ID to unsubscribe from
+	 * @param callback - The exact callback function to remove
+	 *
+	 * @example
+	 * ```ts
+	 * const callback = (patches) => console.log('Changed:', patches);
+	 * store.onItemId('todos:updated', 'todo-1', callback);
+	 *
+	 * // Later:
+	 * store.offItemId('todos:updated', 'todo-1', callback);
+	 * ```
+	 */
+	public offItemId<K extends ExtractArrayFields<T>>(
+		event: EventName<K & string>,
+		itemId: string | number,
+		callback: (patches: Patches) => void,
+	): void {
+		// Type assertions needed due to TypeScript limitations
+		this.emitter.offKeyed(event as any, itemId as any, callback as any);
+	}
+
+	/**
+	 * Subscribe to an Array field item ID event for a single emission only
+	 *
+	 * @param event - Array field event name in format `${fieldName}:updated`
+	 * @param itemId - The item ID to listen for
+	 * @param callback - Callback function that receives the patches array
+	 * @returns Unsubscribe function to remove listener before it fires
+	 *
+	 * @example
+	 * ```ts
+	 * const unsubscribe = store.onceItemId('todos:updated', 'todo-1', (patches) => {
+	 *   console.log('Todo 1 updated once:', patches);
+	 * });
+	 * ```
+	 */
+	public onceItemId<K extends ExtractArrayFields<T>>(
+		event: EventName<K & string>,
+		itemId: string | number,
+		callback: (patches: Patches) => void,
+	): () => void;
+
+	/**
+	 * Subscribe to all item IDs in an Array field for a single emission only (wildcard)
+	 *
+	 * @param event - Array field event name in format `${fieldName}:updated`
+	 * @param itemId - Use '*' to listen to all item IDs
+	 * @param callback - Callback function that receives the item ID and patches array
+	 * @returns Unsubscribe function to remove listener before it fires
+	 *
+	 * @example
+	 * ```ts
+	 * const unsubscribe = store.onceItemId('todos:updated', '*', (itemId, patches) => {
+	 *   console.log(`Todo ${itemId} updated once:`, patches);
+	 * });
+	 * ```
+	 */
+	public onceItemId<K extends ExtractArrayFields<T>>(
+		event: EventName<K & string>,
+		itemId: '*',
+		callback: (itemId: string | number, patches: Patches) => void,
+	): () => void;
+
+	/** @internal */
+	public onceItemId<K extends ExtractArrayFields<T>>(
+		event: EventName<K & string>,
+		itemId: string | number | '*',
+		callback: (...args: any[]) => void,
+	): () => void {
+		// Validate that getItemId is configured for this array field
+		const fieldName = (event as string).replace(':updated', '');
+		if (!this.options?.getItemId?.[fieldName]) {
+			throw new Error(
+				`onceItemId requires getItemId configuration for field '${fieldName}'. ` +
+					`Configure it when creating the store: createObservableStore(state, { getItemId: { ${fieldName}: item => item.id } })`,
+			);
+		}
+		// Type assertions needed due to TypeScript limitations with generic string literals
+		return this.emitter.onceKeyed(event as any, itemId as any, callback as any);
 	}
 
 	/**
@@ -488,28 +650,27 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	}
 
 	/**
-	 * Create keyed subscribe handlers for all fields in the state
+	 * Create key subscribe handlers for Record fields in the state
 	 * Each handler:
 	 * 1. Takes a key as parameter
 	 * 2. Calls the callback immediately with the current value
-	 * 3. Subscribes to keyed field updates to call the callback on each change
+	 * 3. Subscribes to key field updates to call the callback on each change
 	 * 4. Returns an unsubscribe function
 	 *
-	 * Note: Arrays without getItemId configuration are skipped because
-	 * keyed events for arrays require getItemId to use item IDs instead of indices.
+	 * Note: Only non-array fields are included.
 	 */
-	private createKeyedSubscribeHandlers(): KeyedSubscriptionsMap<T> {
-		const keyedSubscriptions = {} as KeyedSubscriptionsMap<T>;
+	private createKeySubscribeHandlers(): KeySubscriptionsMap<T> {
+		const keySubscriptions = {} as KeySubscriptionsMap<T>;
 
 		for (const key of Object.keys(this.state) as Array<keyof T>) {
 			const fieldValue = this.state[key];
 
-			// Skip arrays without getItemId configuration
-			if (Array.isArray(fieldValue) && !this.options?.getItemId?.[key as string]) {
+			// Skip array fields - they use itemIdSubscriptions instead
+			if (Array.isArray(fieldValue)) {
 				continue;
 			}
 
-			keyedSubscriptions[key] = (subscriptionKey: ExtractKeyType<T[typeof key]>) => {
+			(keySubscriptions as any)[key] = (subscriptionKey: ExtractRecordKeyType<T[typeof key]>) => {
 				return (callback: (value: Readonly<T[keyof T]>) => void) => {
 					// Call immediately with current value
 					callback(this.get(key));
@@ -525,7 +686,47 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 			};
 		}
 
-		return keyedSubscriptions;
+		return keySubscriptions;
+	}
+
+	/**
+	 * Create item ID subscribe handlers for Array fields with getItemId configuration
+	 * Each handler:
+	 * 1. Takes an item ID as parameter
+	 * 2. Calls the callback immediately with the current value
+	 * 3. Subscribes to item ID updates to call the callback on each change
+	 * 4. Returns an unsubscribe function
+	 *
+	 * Note: Only array fields with getItemId configuration are included.
+	 */
+	private createItemIdSubscribeHandlers(): ItemIdSubscriptionsMap<T> {
+		const itemIdSubscriptions = {} as ItemIdSubscriptionsMap<T>;
+
+		for (const key of Object.keys(this.state) as Array<keyof T>) {
+			const fieldValue = this.state[key];
+
+			// Only include array fields with getItemId configuration
+			if (!Array.isArray(fieldValue) || !this.options?.getItemId?.[key as string]) {
+				continue;
+			}
+
+			(itemIdSubscriptions as any)[key] = (itemId: string | number) => {
+				return (callback: (value: Readonly<T[keyof T]>) => void) => {
+					// Call immediately with current value
+					callback(this.get(key));
+
+					// Subscribe to item ID updates and call callback with new value on each change
+					const eventName = `${String(key)}:updated` as EventNames<T>;
+					const unsubscribe = this.emitter.onKeyed(eventName as any, itemId as any, () => {
+						callback(this.get(key));
+					});
+
+					return unsubscribe;
+				};
+			};
+		}
+
+		return itemIdSubscriptions;
 	}
 
 	/**
