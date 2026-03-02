@@ -2732,12 +2732,11 @@ describe('ObservableStore', () => {
 				// Verify patches exist and reference the new index
 				expect(allPatches.length).toBeGreaterThan(0);
 				// Check that patches reference index 2 (the added element)
-				const referencesIndex2 = allPatches.some((p) =>
-					p.path.includes(2) || p.path.includes('2')
-				);
+				const referencesIndex2 = allPatches.some((p) => p.path.includes(2) || p.path.includes('2'));
 				expect(referencesIndex2).toBe(true);
 			});
 
+			// TODO show that it use length, but we could also add a test with arrayLengthAssignment=false (patch-recorder)
 			it('documents pop behavior: patches may not reference removed index directly', () => {
 				// IMPORTANT: This test documents the actual behavior of patch-recorder.
 				// When using pop(), the patches generated may not directly reference
@@ -2841,25 +2840,29 @@ describe('ObservableStore', () => {
 				};
 
 				const store = createObservableStore<State>({
-					items: [
-						{id: 1, text: 'First'},
-					],
+					items: [{id: 1, text: 'First'}],
 				});
 
 				const callback1 = vi.fn();
 				store.onKeyed('items:updated', 1, callback1);
 
 				// First push - creates index 1
-				store.update((state) => { state.items.push({id: 2, text: 'Second'}); });
+				store.update((state) => {
+					state.items.push({id: 2, text: 'Second'});
+				});
 				// Arrays without getItemId do not emit keyed events
 				expect(callback1).not.toHaveBeenCalled();
 
 				// Modify index 1
-				store.update((state) => { state.items[1].text = 'Modified Second'; });
+				store.update((state) => {
+					state.items[1].text = 'Modified Second';
+				});
 				expect(callback1).not.toHaveBeenCalled();
 
 				// Replace index 1
-				store.update((state) => { state.items[1] = {id: 3, text: 'Third'}; });
+				store.update((state) => {
+					state.items[1] = {id: 3, text: 'Third'};
+				});
 				expect(callback1).not.toHaveBeenCalled();
 
 				// Verify final state
@@ -2890,16 +2893,24 @@ describe('ObservableStore', () => {
 				store.on('items:updated', fieldCallback);
 
 				// All these operations trigger the field-level event
-				store.update((state) => { state.items.pop(); });
+				store.update((state) => {
+					state.items.pop();
+				});
 				expect(fieldCallback).toHaveBeenCalledTimes(1);
 
-				store.update((state) => { state.items.push({id: 4, text: 'Fourth'}); });
+				store.update((state) => {
+					state.items.push({id: 4, text: 'Fourth'});
+				});
 				expect(fieldCallback).toHaveBeenCalledTimes(2);
 
-				store.update((state) => { state.items.shift(); });
+				store.update((state) => {
+					state.items.shift();
+				});
 				expect(fieldCallback).toHaveBeenCalledTimes(3);
 
-				store.update((state) => { state.items.reverse(); });
+				store.update((state) => {
+					state.items.reverse();
+				});
 				expect(fieldCallback).toHaveBeenCalledTimes(4);
 
 				// Field-level subscription is the reliable pattern for arrays
@@ -3089,7 +3100,12 @@ describe('ObservableStore', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
 				const store = createObservableStore<State>(
-					{items: [{id: 'a', value: 1}, {id: 'b', value: 2}]},
+					{
+						items: [
+							{id: 'a', value: 1},
+							{id: 'b', value: 2},
+						],
+					},
 					{getItemId: {items: (item) => item.id}},
 				);
 
@@ -3107,7 +3123,12 @@ describe('ObservableStore', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
 				const store = createObservableStore<State>(
-					{items: [{id: 'a', value: 1}, {id: 'b', value: 2}]},
+					{
+						items: [
+							{id: 'a', value: 1},
+							{id: 'b', value: 2},
+						],
+					},
 					{getItemId: {items: (item) => item.id}},
 				);
 
@@ -3166,7 +3187,12 @@ describe('ObservableStore', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
 				const store = createObservableStore<State>(
-					{items: [{id: 'a', value: 1}, {id: 'b', value: 2}]},
+					{
+						items: [
+							{id: 'a', value: 1},
+							{id: 'b', value: 2},
+						],
+					},
 					{getItemId: {items: (item) => item.id}},
 				);
 
@@ -3189,7 +3215,12 @@ describe('ObservableStore', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
 				const store = createObservableStore<State>(
-					{items: [{id: 'a', value: 1}, {id: 'b', value: 2}]},
+					{
+						items: [
+							{id: 'a', value: 1},
+							{id: 'b', value: 2},
+						],
+					},
 					{getItemId: {items: (item) => item.id}},
 				);
 
@@ -3232,7 +3263,12 @@ describe('ObservableStore', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
 				const store = createObservableStore<State>(
-					{items: [{id: 'a', value: 1}, {id: 'b', value: 2}]},
+					{
+						items: [
+							{id: 'a', value: 1},
+							{id: 'b', value: 2},
+						],
+					},
 					{getItemId: {items: (item) => item.id}},
 				);
 
@@ -3269,7 +3305,12 @@ describe('ObservableStore', () => {
 				type State = {items: Array<{id: number; value: string}>};
 
 				const store = createObservableStore<State>(
-					{items: [{id: 1, value: 'a'}, {id: 2, value: 'b'}]},
+					{
+						items: [
+							{id: 1, value: 'a'},
+							{id: 2, value: 'b'},
+						],
+					},
 					{getItemId: {items: (item) => item.id}},
 				);
 
@@ -3330,7 +3371,12 @@ describe('ObservableStore', () => {
 				type State = {items: Array<{id: string | null; value: number}>};
 
 				const store = createObservableStore<State>(
-					{items: [{id: null, value: 1}, {id: 'b', value: 2}]}, // First item has null id
+					{
+						items: [
+							{id: null, value: 1},
+							{id: 'b', value: 2},
+						],
+					}, // First item has null id
 					{getItemId: {items: (item) => item.id}}, // Returns null for first item
 				);
 
@@ -3533,7 +3579,12 @@ describe('ObservableStore', () => {
 				type State = {items: Array<{id: number; value: string}>};
 
 				const store = createObservableStore<State>(
-					{items: [{id: 0, value: 'first'}, {id: 1, value: 'second'}]},
+					{
+						items: [
+							{id: 0, value: 'first'},
+							{id: 1, value: 'second'},
+						],
+					},
 					{getItemId: {items: (item) => item.id}},
 				);
 
@@ -3553,7 +3604,12 @@ describe('ObservableStore', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
 				const store = createObservableStore<State>(
-					{items: [{id: '', value: 1}, {id: 'b', value: 2}]},
+					{
+						items: [
+							{id: '', value: 1},
+							{id: 'b', value: 2},
+						],
+					},
 					{getItemId: {items: (item) => item.id}},
 				);
 
