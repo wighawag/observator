@@ -322,8 +322,8 @@ describe('Svelte Reactivity', () => {
 
 		it('should only re-run effects for relevant array index updates', () => {
 			const cleanup = $effect.root(() => {
-				// With getItemId configured, array subscriptions use item IDs instead of indices
-				// This provides fine-grained reactivity where only the affected item's effects re-run
+				// With getItemId configured, array subscriptions use item IDs for keyed events
+				// Combined with structural subscriber (path.length <= 2), this provides fine-grained reactivity
 				const observableStore = createObservableStore(
 					{
 						items: [
@@ -360,7 +360,7 @@ describe('Svelte Reactivity', () => {
 				expect(item1Runs).toBe(1);
 				expect(item2Runs).toBe(1);
 
-				// Update only index 0 - indices 1 and 2 should NOT re-run
+				// Update only index 0 - only item 0's effect should re-run (keyed subscription)
 				store.update((s) => {
 					s.items[0].done = true;
 				});
@@ -370,7 +370,7 @@ describe('Svelte Reactivity', () => {
 				expect(item1Runs).toBe(1);
 				expect(item2Runs).toBe(1);
 
-				// Update only index 1 - indices 0 and 2 should NOT re-run
+				// Update only index 1 - only item 1's effect should re-run
 				store.update((s) => {
 					s.items[1].text = 'Modified Second';
 				});
@@ -380,7 +380,7 @@ describe('Svelte Reactivity', () => {
 				expect(item1Runs).toBe(2);
 				expect(item2Runs).toBe(1);
 
-				// Update only index 2 - indices 0 and 1 should NOT re-run
+				// Update only index 2 - only item 2's effect should re-run
 				store.update((s) => {
 					s.items[2].done = true;
 				});
@@ -1598,10 +1598,10 @@ describe('Svelte Reactivity', () => {
 				cleanup();
 			});
 
-			it('should handle conditional rendering based on item existence (requires length tracking for removals)', () => {
-				// NOTE: When an item is removed, observator does NOT emit keyed events for the removed item.
-				// Effects subscribed to a removed item's keyed event won't re-run automatically.
-				// Users who need to detect structural changes should ALSO track the array (e.g., via .length).
+			it('should handle conditional rendering based on item existence (works without length tracking)', () => {
+				// When accessing an array index, we subscribe to field-level events so that
+				// structural changes (adds/removes) automatically trigger effect re-runs.
+				// This means you don't need to explicitly track .length to detect item existence changes.
 				const cleanup = $effect.root(() => {
 					const observableStore = createObservableStore(
 						{
@@ -1610,36 +1610,35 @@ describe('Svelte Reactivity', () => {
 						{ getItemId: { items: (item: { id: string }) => item.id } }
 					);
 					const store = useSvelteReactivity(observableStore);
-
+	
 					const item1Exists: boolean[] = [];
-
+	
 					$effect(() => {
-						// Access length to subscribe to structural changes
-						const length = store.items.length;
-						// Check if item at index 1 exists
-						item1Exists.push(length > 1 && store.items[1] !== undefined);
+						// Just accessing store.items[1] is enough - no need to track .length
+						// The proxy automatically subscribes to field-level events for structural changes
+						item1Exists.push(store.items[1] !== undefined);
 					});
-
+	
 					flushSync();
 					expect(item1Exists).toEqual([false]);
-
+	
 					// Push an item
 					store.update((s) => {
 						s.items.push({ id: 'b', text: 'Second' });
 					});
-
+	
 					flushSync();
 					expect(item1Exists[item1Exists.length - 1]).toBe(true);
-
-					// Pop it - effect re-runs because we track .length
+	
+					// Pop it - effect re-runs because array index access subscribes to field events
 					store.update((s) => {
 						s.items.pop();
 					});
-
+	
 					flushSync();
 					expect(item1Exists[item1Exists.length - 1]).toBe(false);
 				});
-
+	
 				cleanup();
 			});
 		});

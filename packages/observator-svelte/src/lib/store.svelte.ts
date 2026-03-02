@@ -53,6 +53,7 @@ export type ReactiveStoreWithFields<T extends Record<string, unknown> & NonPrimi
 export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 	private readonly fieldSubscribers: Map<keyof T, () => void> = new Map();
 	private readonly keyedSubscribers: Map<string, () => void> = new Map();
+	private readonly structuralSubscribers: Map<keyof T, () => void> = new Map();
 
 	// Proxy caches to maintain object identity
 	private readonly fieldProxyCache: Map<string, object> = new Map();
@@ -104,6 +105,40 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 			this.fieldSubscribers.set(field, subscriber);
 		}
 		return this.fieldSubscribers.get(field)!;
+	}
+
+	/**
+	 * Get or create a structural subscriber for a field.
+	 * Only triggers on structural changes (patches with path.length <= 2),
+	 * not on nested property changes within array items.
+	 * This allows detecting array add/remove operations without re-running
+	 * on every item property change.
+	 */
+	private getOrCreateStructuralSubscriber<K extends keyof T>(field: K): () => void {
+		if (!this.structuralSubscribers.has(field)) {
+			const subscriber = createSubscriber((update) => {
+				// Subscribe to field:updated event but filter by path length
+				const eventName = `${String(field)}:updated` as `${string}:updated`;
+				const unsubscribe = this.observableStore.on(eventName as any, (patches: Patches) => {
+					// Only trigger for structural changes (path length <= 2)
+					// Path examples:
+					// - /items (path.length=1) - field replaced
+					// - /items/0 (path.length=2) - item at index replaced/added
+					// - /items/length (path.length=2) - length changed
+					// - /items/0/text (path.length=3) - nested property change (SKIP)
+					const hasStructuralChange = patches.some((patch) => patch.path.length <= 2);
+					if (hasStructuralChange) {
+						update();
+					}
+				});
+
+				// Cleanup when all effects are destroyed
+				return () => unsubscribe();
+			});
+
+			this.structuralSubscribers.set(field, subscriber);
+		}
+		return this.structuralSubscribers.get(field)!;
 	}
 
 	/**
@@ -164,17 +199,19 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 
 				// Handle array access
 				if (isArray && /^\d+$/.test(prop)) {
-					// For arrays with getItemId, use item ID for keyed subscription
+					// Subscribe to structural changes (adds/removes) for array index access
+					// This only triggers on patches with path.length <= 2, not nested property changes
+					store.getOrCreateStructuralSubscriber(field as keyof T)();
+
+					// For arrays with getItemId, ALSO use item ID for keyed subscription
 					// This provides fine-grained reactivity where only the affected item's effect re-runs
-					// Note: observator does NOT emit keyed events for item removals, so effects
-					// subscribed to removed items won't re-run. Users tracking structural changes
-					// should also access the array itself (e.g., iterate over it or access .length)
+					// when the specific item's properties change (not just structural changes)
 					if (hasGetItemId && value !== undefined && value !== null) {
 						const itemId = (getItemIdFn as (value: any) => string | number | undefined | null)(
 							value
 						);
 						if (itemId !== undefined && itemId !== null) {
-							// Use item ID for keyed subscription
+							// Use item ID for keyed subscription (in addition to structural)
 							store.ensureKeyedSubscription(field, itemId);
 							// Wrap return value in PropertyProxy using itemId as key
 							if (typeof value === 'object') {
@@ -183,8 +220,7 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 							return value;
 						}
 					}
-					// No getItemId or no ID - use field-level subscription for arrays
-					// This handles: arrays without getItemId, undefined values (out of bounds), null values
+					// No getItemId or no ID - use field-level subscription for all changes
 					store.getOrCreateFieldSubscriber(field as keyof T)();
 					if (value !== null && typeof value === 'object') {
 						return value;
