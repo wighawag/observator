@@ -18,6 +18,7 @@ import {
 	CreateFunction,
 	PatchPath,
 	GetItemIdConfig,
+	GetItemIdFunction,
 } from './types.js';
 
 // Re-export types for consumers
@@ -52,9 +53,18 @@ function createFromPatchRecorder<T extends NonPrimitive>(
 	return [state, recordPatches<T>(state, mutate, {getItemId})];
 }
 
-export type ObservableStoreOptions = {
+/**
+ * Options for creating an ObservableStore
+ * @template Config - The getItemId configuration type, inferred from the config object
+ */
+export type ObservableStoreOptions<
+	Config extends Record<string, GetItemIdFunction | GetItemIdConfig | undefined> = Record<
+		string,
+		GetItemIdFunction | GetItemIdConfig | undefined
+	>,
+> = {
 	createFunction?: CreateFunction;
-	getItemId?: GetItemIdConfig;
+	getItemId?: Config;
 };
 
 type RecursiveMap<Key, Value> = Map<Key, {value?: Value; children?: RecursiveMap<Key, Value>}>;
@@ -97,25 +107,31 @@ type RecursiveMap<Key, Value> = Map<Key, {value?: Value; children?: RecursiveMap
  *   // Emits 'user:updated', 'count:updated', and 'items:updated' events
  * });
  * ```
+ *
+ * @template T - The state type
+ * @template ItemIdKeys - String union of array field names that have getItemId configured
  */
-export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
-	private emitter: Emitter<any, any>;
+export class ObservableStore<
+ T extends Record<string, unknown> & NonPrimitive,
+ ItemIdKeys extends string = never,
+> {
+ private emitter: Emitter<any, any>;
 
-	public subscriptions: SubscriptionsMap<T>;
-	public keySubscriptions: KeySubscriptionsMap<T>;
-	public itemIdSubscriptions: ItemIdSubscriptionsMap<T>;
+ public subscriptions: SubscriptionsMap<T>;
+ public keySubscriptions: KeySubscriptionsMap<T>;
+ public itemIdSubscriptions: ItemIdSubscriptionsMap<T, ItemIdKeys>;
 
-	private create: CreateFunction;
+ private create: CreateFunction;
 
-	private specificListeners: RecursiveMap<PatchPath, {listeners: ((patches: Patches) => void)[]}> =
-		new Map();
+ private specificListeners: RecursiveMap<PatchPath, {listeners: ((patches: Patches) => void)[]}> =
+ 	new Map();
 
-	private arrayFields: Set<string>;
+ private arrayFields: Set<string>;
 
-	constructor(
-		protected state: T,
-		protected options?: ObservableStoreOptions,
-	) {
+ constructor(
+ 	protected state: T,
+ 	protected options?: ObservableStoreOptions<any>,
+ ) {
 		this.create = options?.createFunction ?? createFromPatchRecorder;
 		this.emitter = createEmitter();
 		this.arrayFields = this.detectArrayFields();
@@ -469,7 +485,7 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 * });
 	 * ```
 	 */
-	public onItemId<K extends ExtractArrayFields<T>>(
+	public onItemId<K extends ItemIdKeys>(
 		event: EventName<K & string>,
 		itemId: string | number,
 		callback: (patches: Patches) => void,
@@ -490,14 +506,14 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 * });
 	 * ```
 	 */
-	public onItemId<K extends ExtractArrayFields<T>>(
+	public onItemId<K extends ItemIdKeys>(
 		event: EventName<K & string>,
 		itemId: '*',
 		callback: (itemId: string | number, patches: Patches) => void,
 	): () => void;
 
 	/** @internal */
-	public onItemId<K extends ExtractArrayFields<T>>(
+	public onItemId<K extends ItemIdKeys>(
 		event: EventName<K & string>,
 		itemId: string | number | '*',
 		callback: (...args: any[]) => void,
@@ -530,7 +546,7 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 * store.offItemId('todos:updated', 'todo-1', callback);
 	 * ```
 	 */
-	public offItemId<K extends ExtractArrayFields<T>>(
+	public offItemId<K extends ItemIdKeys>(
 		event: EventName<K & string>,
 		itemId: string | number,
 		callback: (patches: Patches) => void,
@@ -554,7 +570,7 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 * });
 	 * ```
 	 */
-	public onceItemId<K extends ExtractArrayFields<T>>(
+	public onceItemId<K extends ItemIdKeys>(
 		event: EventName<K & string>,
 		itemId: string | number,
 		callback: (patches: Patches) => void,
@@ -575,14 +591,14 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 * });
 	 * ```
 	 */
-	public onceItemId<K extends ExtractArrayFields<T>>(
+	public onceItemId<K extends ItemIdKeys>(
 		event: EventName<K & string>,
 		itemId: '*',
 		callback: (itemId: string | number, patches: Patches) => void,
 	): () => void;
 
 	/** @internal */
-	public onceItemId<K extends ExtractArrayFields<T>>(
+	public onceItemId<K extends ItemIdKeys>(
 		event: EventName<K & string>,
 		itemId: string | number | '*',
 		callback: (...args: any[]) => void,
@@ -699,8 +715,8 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 	 *
 	 * Note: Only array fields with getItemId configuration are included.
 	 */
-	private createItemIdSubscribeHandlers(): ItemIdSubscriptionsMap<T> {
-		const itemIdSubscriptions = {} as ItemIdSubscriptionsMap<T>;
+	private createItemIdSubscribeHandlers(): ItemIdSubscriptionsMap<T, ItemIdKeys> {
+		const itemIdSubscriptions = {} as ItemIdSubscriptionsMap<T, ItemIdKeys>;
 
 		for (const key of Object.keys(this.state) as Array<keyof T>) {
 			const fieldValue = this.state[key];
@@ -848,28 +864,120 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
  * Create an ObservableStore instance with the given initial state
  *
  * @param state - The initial state object
+ * @param options - Optional configuration including getItemId for array fields
  * @returns A new ObservableStore instance
  *
  * @example
  * ```ts
+ * // Without getItemId - onItemId will not be available
  * const store = createObservableStore({
  *   user: { name: 'John', age: 30 },
- *   counter: { value: 0 }
+ *   items: ['a', 'b']
  * });
+ *
+ * // With getItemId - onItemId available for 'todos' field
+ * const store = createObservableStore(
+ *   { todos: [{ id: '1', text: 'Hello' }] },
+ *   { getItemId: { todos: item => item.id } }
+ * );
+ * store.onItemId('todos:updated', '1', callback); // Type-safe!
  * ```
  */
+// Helper type to extract keys from getItemId config - accepts any function
+type ExtractItemIdKeys<G> = G extends Record<string, (...args: any[]) => any>
+	? keyof G & string
+	: never;
+
+// Overload 1: With getItemId - G is inferred from the required getItemId property
+export function createObservableStore<
+	T extends Record<string, unknown> & NonPrimitive,
+	G extends Record<string, (item: any) => any>,
+>(
+	state: T,
+	options: {getItemId: G; createFunction?: CreateFunction},
+): ObservableStore<T, keyof G & string>;
+
+// Overload 2: Without getItemId (options without getItemId or no options at all)
 export function createObservableStore<T extends Record<string, unknown> & NonPrimitive>(
 	state: T,
-	options?: ObservableStoreOptions,
-): ObservableStore<T> {
+	options?: {createFunction?: CreateFunction},
+): ObservableStore<T, never>;
+
+// Implementation signature - uses any for options to handle both cases
+export function createObservableStore<T extends Record<string, unknown> & NonPrimitive>(
+	state: T,
+	options?: {getItemId?: Record<string, (item: any) => any>; createFunction?: CreateFunction},
+): ObservableStore<T, any> {
 	return new ObservableStore(state, options);
 }
 
-export function createObservableStoreFactory(factoryOptions: ObservableStoreOptions) {
-	return function createObservableStore<T extends Record<string, unknown> & NonPrimitive>(
+/**
+ * Create a factory function for creating ObservableStore instances with shared options
+ *
+ * @param factoryOptions - Default options to apply to all stores created by this factory
+ * @returns A factory function for creating ObservableStore instances
+ *
+ * @example
+ * ```ts
+ * // Factory with shared getItemId config
+ * const createStore = createObservableStoreFactory({
+ *   getItemId: { items: item => item.id }
+ * });
+ *
+ * // All stores created with this factory will have 'items' onItemId available
+ * const store = createStore({ items: [{id: '1', value: 10}] });
+ * store.onItemId('items:updated', '1', callback); // Type-safe!
+ * ```
+ */
+
+// Overload 1: Factory with getItemId - all stores get those ItemIdKeys
+export function createObservableStoreFactory<
+	FG extends Record<string, (item: any) => any>,
+>(
+	factoryOptions: {getItemId: FG; createFunction?: CreateFunction},
+): {
+	// Inner overload 1: With additional getItemId at store level
+	<T extends Record<string, unknown> & NonPrimitive, G extends Record<string, (item: any) => any>>(
 		state: T,
-		options?: ObservableStoreOptions,
-	): ObservableStore<T> {
-		return new ObservableStore(state, options ? {...factoryOptions, ...options} : factoryOptions);
+		options: {getItemId: G; createFunction?: CreateFunction},
+	): ObservableStore<T, (keyof FG | keyof G) & string>;
+
+	// Inner overload 2: Without additional getItemId
+	<T extends Record<string, unknown> & NonPrimitive>(
+		state: T,
+		options?: {createFunction?: CreateFunction},
+	): ObservableStore<T, keyof FG & string>;
+};
+
+// Overload 2: Factory without getItemId
+export function createObservableStoreFactory(
+	factoryOptions?: {createFunction?: CreateFunction},
+): {
+	// Inner overload 1: With getItemId at store level
+	<T extends Record<string, unknown> & NonPrimitive, G extends Record<string, (item: any) => any>>(
+		state: T,
+		options: {getItemId: G; createFunction?: CreateFunction},
+	): ObservableStore<T, keyof G & string>;
+
+	// Inner overload 2: Without getItemId
+	<T extends Record<string, unknown> & NonPrimitive>(
+		state: T,
+		options?: {createFunction?: CreateFunction},
+	): ObservableStore<T, never>;
+};
+
+// Implementation
+export function createObservableStoreFactory<
+	FG extends Record<string, (item: any) => any> | undefined = undefined,
+>(factoryOptions?: {getItemId?: FG; createFunction?: CreateFunction}) {
+	return function createObservableStore<
+		T extends Record<string, unknown> & NonPrimitive,
+		G extends Record<string, (item: any) => any> | undefined = undefined,
+	>(
+		state: T,
+		options?: {getItemId?: G; createFunction?: CreateFunction},
+	): ObservableStore<T, any> {
+		const mergedOptions = options ? {...factoryOptions, ...options} : factoryOptions;
+		return new ObservableStore(state, mergedOptions);
 	};
 }

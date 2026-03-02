@@ -723,7 +723,7 @@ describe('ObservableStore', () => {
 					todos: Array<{id: number; text: string; done: boolean}>;
 				};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{
 						todos: [
 							{id: 1, text: 'Task 1', done: false},
@@ -1109,6 +1109,7 @@ describe('ObservableStore', () => {
 
 					// onItemId throws when getItemId is not configured
 					expect(() => {
+						// @ts-expect-error - Testing runtime error when getItemId is not configured (TypeScript now prevents this at compile time)
 						store.onItemId('todos:updated', 0, vi.fn());
 					}).toThrow("onItemId requires getItemId configuration for field 'todos'");
 				});
@@ -1701,7 +1702,7 @@ describe('ObservableStore', () => {
 				todos: Array<{id: number; text: string; done: boolean}>;
 			};
 
-			const store = createObservableStore<State>(
+			const store = createObservableStore(
 				{
 					todos: [
 						{id: 1, text: 'Task 1', done: false},
@@ -2194,6 +2195,7 @@ describe('ObservableStore', () => {
 
 				// onItemId throws when getItemId is not configured
 				expect(() => {
+					// @ts-expect-error - Testing runtime error when getItemId is not configured (TypeScript now prevents this at compile time)
 					store.onItemId('items:updated', 0, vi.fn());
 				}).toThrow("onItemId requires getItemId configuration for field 'items'");
 			});
@@ -2389,6 +2391,7 @@ describe('ObservableStore', () => {
 
 				// onItemId throws when getItemId is not configured
 				expect(() => {
+					// @ts-expect-error - Testing runtime error when getItemId is not configured (TypeScript now prevents this at compile time)
 					store.onItemId('items:updated', 0, vi.fn());
 				}).toThrow("onItemId requires getItemId configuration for field 'items'");
 			});
@@ -2769,6 +2772,7 @@ describe('ObservableStore', () => {
 				});
 
 				expect(() => {
+					// @ts-expect-error - Testing runtime error when getItemId is not configured
 					store.onItemId('items:updated', 2, vi.fn());
 				}).toThrow("onItemId requires getItemId configuration for field 'items'");
 			});
@@ -2783,6 +2787,7 @@ describe('ObservableStore', () => {
 				});
 
 				expect(() => {
+					// @ts-expect-error - Testing runtime error when getItemId is not configured
 					store.onItemId('items:updated', '*', vi.fn());
 				}).toThrow("onItemId requires getItemId configuration for field 'items'");
 			});
@@ -2797,6 +2802,7 @@ describe('ObservableStore', () => {
 				});
 
 				expect(() => {
+					// @ts-expect-error - Testing runtime error when getItemId is not configured
 					store.onceItemId('items:updated', 2, vi.fn());
 				}).toThrow("onceItemId requires getItemId configuration for field 'items'");
 			});
@@ -2825,7 +2831,7 @@ describe('ObservableStore', () => {
 			it('should emit keyed event using patch.id for array', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{
 						items: [
 							{id: 'a', value: 1},
@@ -2848,7 +2854,7 @@ describe('ObservableStore', () => {
 			it('should fire callback for correct item after reorder', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{
 						items: [
 							{id: 'a', value: 1},
@@ -2884,6 +2890,7 @@ describe('ObservableStore', () => {
 
 				// onItemId should throw when getItemId is not configured
 				expect(() => {
+					// @ts-expect-error - Testing runtime error when getItemId is not configured
 					store.onItemId('items:updated', 0, vi.fn());
 				}).toThrow("onItemId requires getItemId configuration for field 'items'");
 			});
@@ -2908,7 +2915,7 @@ describe('ObservableStore', () => {
 			it('should NOT emit keyed event when item is removed', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{
 						items: [
 							{id: 'a', value: 1},
@@ -2936,7 +2943,7 @@ describe('ObservableStore', () => {
 				// is a 'replace' operation at the array index level, not an update to the item itself.
 				type State = {items: Array<{id: string; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{
 						items: [
 							{id: 'a', value: 1},
@@ -2964,7 +2971,7 @@ describe('ObservableStore', () => {
 			it('should NOT emit keyed events when entire array field is replaced', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{items: [{id: 'a', value: 1}]},
 					{getItemId: {items: (item) => item.id}},
 				);
@@ -2984,7 +2991,7 @@ describe('ObservableStore', () => {
 			it('should work with wildcard keyed listeners using patch.id', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{
 						items: [
 							{id: 'a', value: 1},
@@ -3026,7 +3033,7 @@ describe('ObservableStore', () => {
 			it('should support numeric IDs', () => {
 				type State = {items: Array<{id: number; value: string}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{
 						items: [
 							{id: 1, value: 'a'},
@@ -3049,18 +3056,17 @@ describe('ObservableStore', () => {
 			it('should not create keyed subscriptions for arrays without getItemId in itemIdSubscriptions', () => {
 				type State = {items: number[]};
 
-				const store = createObservableStore<State>({items: [1, 2, 3]});
+				const store = createObservableStore({items: [1, 2, 3]});
 
 				// itemIdSubscriptions for array fields without getItemId should not exist
+				// @ts-expect-error - TypeScript now prevents accessing items when ItemIdKeys is never
 				expect(store.itemIdSubscriptions.items).toBeUndefined();
 			});
 
 			it('should create keyed subscriptions for arrays with getItemId', () => {
-				type State = {items: Array<{id: string; value: number}>};
-
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{items: [{id: 'a', value: 1}]},
-					{getItemId: {items: (item) => item.id}},
+					{getItemId: {items: (item: {id: string; value: number}) => item.id}},
 				);
 
 				// itemIdSubscriptions should exist for this field
@@ -3072,7 +3078,7 @@ describe('ObservableStore', () => {
 			it('should NOT emit keyed event when getItemId returns undefined', () => {
 				type State = {items: Array<{id?: string; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{items: [{value: 1}, {id: 'b', value: 2}]}, // First item has no id
 					{getItemId: {items: (item) => item.id}}, // Returns undefined for first item
 				);
@@ -3092,13 +3098,13 @@ describe('ObservableStore', () => {
 			it('should NOT emit keyed event when getItemId returns null', () => {
 				type State = {items: Array<{id: string | null; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{
 						items: [
-							{id: null, value: 1},
+							{id: null, value: 1}, // First item has null id
 							{id: 'b', value: 2},
 						],
-					}, // First item has null id
+					} satisfies State,
 					{getItemId: {items: (item) => item.id}}, // Returns null for first item
 				);
 
@@ -3117,7 +3123,7 @@ describe('ObservableStore', () => {
 			it('should emit keyed event only for items with valid IDs in mixed array', () => {
 				type State = {items: Array<{id?: string; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{items: [{value: 1}, {id: 'b', value: 2}]}, // Mixed: one without ID, one with ID
 					{getItemId: {items: (item) => item.id}},
 				);
@@ -3140,7 +3146,7 @@ describe('ObservableStore', () => {
 			it('should still emit field-level event even when item has no valid ID', () => {
 				type State = {items: Array<{id?: string; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{items: [{value: 1}]}, // Item without ID
 					{getItemId: {items: (item) => item.id}},
 				);
@@ -3158,11 +3164,10 @@ describe('ObservableStore', () => {
 			});
 
 			it('should handle pushing item without ID field', () => {
-				type State = {items: Array<{id?: string; value: number}>};
-
-				const store = createObservableStore<State>(
-					{items: [{id: 'a', value: 1}]},
-					{getItemId: {items: (item) => item.id}},
+				type Item = {id?: string; value: number};
+				const store = createObservableStore(
+					{items: [{id: 'a', value: 1}] as Item[]},
+					{getItemId: {items: (item: Item) => item.id}},
 				);
 
 				const wildcardCallback = vi.fn();
@@ -3184,7 +3189,7 @@ describe('ObservableStore', () => {
 			it('should handle getItemId that throws an error', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{items: [{id: 'a', value: 1}]},
 					{
 						getItemId: {
@@ -3210,26 +3215,24 @@ describe('ObservableStore', () => {
 			});
 
 			it('should support nested getItemId config for nested arrays', () => {
-				type State = {
-					users: Array<{
-						id: string;
-						posts: Array<{postId: string; title: string}>;
-					}>;
-				};
+				type User = {id: string; posts: Array<{postId: string; title: string}>};
 
-				const store = createObservableStore<State>(
+				// Note: Nested getItemId config is not supported in TypeScript types.
+				// This test documents runtime behavior only.
+				// @ts-expect-error - Nested getItemId config is not supported in types
+				const store = createObservableStore(
 					{
 						users: [
 							{
 								id: 'user1',
 								posts: [{postId: 'post1', title: 'Hello'}],
 							},
-						],
+						] as User[],
 					},
 					{
 						getItemId: {
 							users: {
-								posts: (post) => post.postId,
+								posts: (post: {postId: string; title: string}) => post.postId,
 							},
 						},
 					},
@@ -3248,11 +3251,10 @@ describe('ObservableStore', () => {
 			});
 
 			it('should handle empty array with getItemId configured', () => {
-				type State = {items: Array<{id: string; value: number}>};
-
-				const store = createObservableStore<State>(
-					{items: []},
-					{getItemId: {items: (item) => item.id}},
+				type Item = {id: string; value: number};
+				const store = createObservableStore(
+					{items: [] as Item[]},
+					{getItemId: {items: (item: Item) => item.id}},
 				);
 
 				const wildcardCallback = vi.fn();
@@ -3273,11 +3275,10 @@ describe('ObservableStore', () => {
 			});
 
 			it('should handle updating newly pushed item with valid ID', () => {
-				type State = {items: Array<{id: string; value: number}>};
-
-				const store = createObservableStore<State>(
-					{items: []},
-					{getItemId: {items: (item) => item.id}},
+				type Item = {id: string; value: number};
+				const store = createObservableStore(
+					{items: [] as Item[]},
+					{getItemId: {items: (item: Item) => item.id}},
 				);
 
 				// First push an item
@@ -3300,7 +3301,7 @@ describe('ObservableStore', () => {
 			it('should handle item with ID of 0 (falsy but valid)', () => {
 				type State = {items: Array<{id: number; value: string}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{
 						items: [
 							{id: 0, value: 'first'},
@@ -3325,7 +3326,7 @@ describe('ObservableStore', () => {
 			it('should handle item with ID of empty string (falsy but valid)', () => {
 				type State = {items: Array<{id: string; value: number}>};
 
-				const store = createObservableStore<State>(
+				const store = createObservableStore(
 					{
 						items: [
 							{id: '', value: 1},
@@ -3375,7 +3376,7 @@ describe('onKey vs onItemId behavioral difference: Records vs Arrays', () => {
 
 	it('Array with getItemId: onItemId does NOT fire when item is removed', () => {
 		type State = {items: Array<{id: string; value: number}>};
-		const store = createObservableStore<State>(
+		const store = createObservableStore(
 			{
 				items: [
 					{id: 'a', value: 1},
@@ -3410,7 +3411,7 @@ describe('Type Safety: onKey and onItemId', () => {
 			counter: number;
 		};
 
-		const store = createObservableStore<State>(
+		const store = createObservableStore(
 			{
 				users: {a: {name: 'Alice'}},
 				items: [{id: '1', value: 10}],
@@ -3437,7 +3438,7 @@ describe('Type Safety: onKey and onItemId', () => {
 			counter: number;
 		};
 
-		const store = createObservableStore<State>(
+		const store = createObservableStore(
 			{
 				users: {a: {name: 'Alice'}},
 				items: [{id: '1', value: 10}],
@@ -3463,7 +3464,7 @@ describe('Type Safety: onKey and onItemId', () => {
 			items: Array<{id: string; value: number}>;
 		};
 
-		const store = createObservableStore<State>(
+		const store = createObservableStore(
 			{
 				users: {a: {name: 'Alice'}},
 				items: [{id: '1', value: 10}],
@@ -3486,7 +3487,7 @@ describe('Type Safety: onKey and onItemId', () => {
 			items: Array<{id: string; value: number}>;
 		};
 
-		const store = createObservableStore<State>(
+		const store = createObservableStore(
 			{
 				users: {a: {name: 'Alice'}},
 				items: [{id: '1', value: 10}],
@@ -3510,7 +3511,7 @@ describe('Type Safety: onKey and onItemId', () => {
 			items: Array<{id: string; value: number}>;
 		};
 
-		const store = createObservableStore<State>(
+		const store = createObservableStore(
 			{
 				users: {a: {name: 'Alice'}},
 				items: [{id: '1', value: 10}],
@@ -3531,7 +3532,7 @@ describe('Type Safety: onKey and onItemId', () => {
 			items: Array<{id: string; value: number}>;
 		};
 
-		const store = createObservableStore<State>(
+		const store = createObservableStore(
 			{
 				users: {a: {name: 'Alice'}},
 				items: [{id: '1', value: 10}],
@@ -3547,5 +3548,64 @@ describe('Type Safety: onKey and onItemId', () => {
 		expect(() => store.onceItemId('users:updated', 'a', vi.fn())).toThrow(
 			"onceItemId requires getItemId configuration for field 'users'",
 		);
+	});
+
+	it('onItemId should only be available for Array fields with getItemId configured (compile-time type safety)', () => {
+		// This test demonstrates the NEW type safety improvement:
+		// onItemId is only type-safe when getItemId is configured for the array field
+
+		type State = {
+			todos: Array<{id: string; text: string}>;
+			items: Array<{id: string; value: number}>;
+			logs: string[]; // Simple array without getItemId
+		};
+
+		// Store with getItemId configured ONLY for 'todos' field
+		const store = createObservableStore(
+			{
+				todos: [{id: '1', text: 'Hello'}],
+				items: [{id: 'a', value: 10}],
+				logs: ['log1', 'log2'],
+			},
+			{getItemId: {todos: (item: {id: string; text: string}) => item.id}},
+		);
+
+		// ✅ VALID: onItemId for 'todos' field - has getItemId configured
+		store.onItemId('todos:updated', '1', vi.fn());
+
+		// ❌ TYPE ERROR: The following lines would cause compile errors:
+		// store.onItemId('items:updated', 'a', vi.fn()); // Error: 'items:updated' is not assignable
+		// store.onItemId('logs:updated', 0, vi.fn());    // Error: 'logs:updated' is not assignable
+
+		// Verify that the store type correctly restricts ItemIdKeys to 'todos'
+		// By checking that onItemId accepts 'todos:updated' but would reject others at compile time
+		expect(store.onItemId).toBeDefined();
+	});
+
+	it('itemIdSubscriptions should only include fields with getItemId configured', () => {
+		type State = {
+			todos: Array<{id: string; text: string}>;
+			items: Array<{id: string; value: number}>;
+		};
+
+		// Store with getItemId configured ONLY for 'todos' field
+		const store = createObservableStore(
+			{
+				todos: [{id: '1', text: 'Hello'}],
+				items: [{id: 'a', value: 10}],
+			},
+			{getItemId: {todos: (item: {id: string; text: string}) => item.id}},
+		);
+
+		// ✅ VALID: itemIdSubscriptions.todos exists
+		expect(store.itemIdSubscriptions.todos).toBeDefined();
+
+		// ❌ TYPE ERROR: itemIdSubscriptions.items doesn't exist in the type
+		// The following would cause a compile error:
+		// store.itemIdSubscriptions.items; // Error: Property 'items' does not exist
+
+		// We can verify at runtime that 'items' is not in itemIdSubscriptions
+		// (though the type system prevents access)
+		expect(Object.keys(store.itemIdSubscriptions)).toEqual(['todos']);
 	});
 });

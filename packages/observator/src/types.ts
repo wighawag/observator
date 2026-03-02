@@ -3,6 +3,14 @@ import type {KeyedEventMap} from 'radiate';
 export type NonPrimitive = object | Array<unknown>;
 
 /**
+ * Valid getItemId configuration for a given state type.
+ * Only array fields can have getItemId configured.
+ */
+export type GetItemIdConfigFor<T extends Record<string, unknown>> = {
+	[K in ExtractArrayFields<T> as K & string]?: GetItemIdFunction;
+};
+
+/**
  * Generate event name for a field key
  * @example EventName<'user'> // 'user:updated'
  */
@@ -143,18 +151,19 @@ export type KeySubscriptionsMap<T extends Record<string, unknown>> = {
 
 /**
  * Item ID subscriptions map type for value-based subscriptions on Array fields
- * Maps each Array field key to a function that takes an item ID and returns a subscribe function
+ * Maps each Array field key (that has getItemId configured) to a function that takes an item ID and returns a subscribe function
  * The subscribe function:
  * - Executes the callback immediately with the current value
  * - Executes the callback on every field update for that specific item ID
  * - Returns an unsubscribe function
  *
  * NOTE: Only fires when item properties are updated, NOT when item is removed.
+ * NOTE: Only array fields with getItemId configured are included in this map.
  *
  * @example
  * ```ts
  * type State = { todos: Array<{ id: string; text: string }> };
- * type ItemIdSubscriptionsMap = ItemIdSubscriptionsMap<State>;
+ * type ItemIdSubscriptionsMap = ItemIdSubscriptionsMap<State, 'todos'>;
  * // {
  * //   todos: {
  * //     (itemId: string | number): (callback: (value: Array<...>) => void) => () => void;
@@ -162,8 +171,11 @@ export type KeySubscriptionsMap<T extends Record<string, unknown>> = {
  * // }
  * ```
  */
-export type ItemIdSubscriptionsMap<T extends Record<string, unknown>> = {
-	[K in ExtractArrayFields<T>]: {
+export type ItemIdSubscriptionsMap<
+	T extends Record<string, unknown>,
+	ItemIdKeys extends string = never,
+> = {
+	[K in ItemIdKeys & ExtractArrayFields<T>]: {
 		(itemId: string | number): (callback: (value: Readonly<T[K]>) => void) => () => void;
 	};
 };
