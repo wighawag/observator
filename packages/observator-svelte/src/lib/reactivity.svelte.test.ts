@@ -334,9 +334,7 @@ describe('Svelte Reactivity', () => {
 					},
 					{ getItemId: { items: (item: { id: number }) => item.id } }
 				);
-				const store = useSvelteReactivity(observableStore, {
-					getItemId: { items: (item: { id: number }) => item.id }
-				});
+				const store = useSvelteReactivity(observableStore);
 
 				let item0Runs = 0;
 				let item1Runs = 0;
@@ -951,9 +949,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id: string }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id: string }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 	
 					const itemAValues: string[] = [];
 					const itemBValues: string[] = [];
@@ -1004,9 +1000,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id: string }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id: string }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 	
 					let itemAtIndex0Runs = 0;
 					let itemAtIndex1Runs = 0;
@@ -1097,9 +1091,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id: string }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id: string }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 	
 					const item1Values: string[] = [];
 	
@@ -1137,9 +1129,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id?: string }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id?: string }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 
 					let item0Runs = 0;
 					let item1Runs = 0;
@@ -1182,9 +1172,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id: string | null }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id: string | null }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 
 					let item0Runs = 0;
 
@@ -1220,9 +1208,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id?: string }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id?: string }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 
 					let item0Runs = 0;
 					let item1Runs = 0;
@@ -1289,9 +1275,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id: number }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id: number }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 
 					let item0Runs = 0;
 					let item1Runs = 0;
@@ -1335,9 +1319,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id: string }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id: string }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 
 					let item0Runs = 0;
 					let item1Runs = 0;
@@ -1378,9 +1360,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id?: string }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id?: string }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 
 					const item1Values: string[] = [];
 
@@ -1418,9 +1398,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id: string }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id: string }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 
 					let itemARuns = 0;
 					let itemBRuns = 0;
@@ -1495,9 +1473,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id: string }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id: string }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 
 					let itemARuns = 0;
 					let itemBRuns = 0;
@@ -1550,9 +1526,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id: string }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id: string }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 
 					const renderedTexts: string[][] = [];
 
@@ -1631,9 +1605,7 @@ describe('Svelte Reactivity', () => {
 						},
 						{ getItemId: { items: (item: { id: string }) => item.id } }
 					);
-					const store = useSvelteReactivity(observableStore, {
-						getItemId: { items: (item: { id: string }) => item.id }
-					});
+					const store = useSvelteReactivity(observableStore);
 
 					const item1Exists: boolean[] = [];
 

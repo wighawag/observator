@@ -3,18 +3,6 @@ import type { ObservableStore } from 'observator';
 import type { NonPrimitive, Patches, Key, GetItemIdConfig } from 'observator';
 
 /**
- * Options for useSvelteReactivity
- */
-export type ReactiveStoreOptions = {
-	/**
-	 * Configuration for extracting item IDs from array elements.
-	 * When configured, array keyed subscriptions use item IDs instead of indices.
-	 * Must match the getItemId configuration used when creating the ObservableStore.
-	 */
-	getItemId?: GetItemIdConfig;
-};
-
-/**
  * Built-in properties that should not create subscriptions
  */
 const BUILTIN_PROPS = new Set(['length', 'constructor', 'prototype', 'toJSON', '__proto__']);
@@ -75,11 +63,8 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 	// Track which fields are arrays
 	private readonly arrayFields: Set<string>;
 
-	constructor(
-		private readonly observableStore: ObservableStore<T>,
-		options?: ReactiveStoreOptions
-	) {
-		this.getItemIdConfig = options?.getItemId;
+	constructor(private readonly observableStore: ObservableStore<T>) {
+		this.getItemIdConfig = observableStore.getItemIdConfig();
 		this.arrayFields = this.detectArrayFields();
 		// Create reactive getters for each field
 		this.createFieldGetters();
@@ -394,12 +379,11 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
  * - `store.users.alice` creates a keyed subscription for 'alice'
  * - `store.user.name` creates a keyed subscription for 'name'
  *
- * For arrays with `getItemId` configured, keyed subscriptions use item IDs
- * instead of array indices, providing stable identity-based subscriptions
+ * For arrays with `getItemId` configured on the ObservableStore, keyed subscriptions
+ * use item IDs instead of array indices, providing stable identity-based subscriptions
  * that survive reordering, insertions, and deletions.
  *
  * @param observableStore - An existing ObservableStore instance
- * @param options - Optional configuration including getItemId for ID-based array subscriptions
  * @returns A ReactiveStore with reactive field getters
  *
  * @example
@@ -424,10 +408,8 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
  *   { getItemId: { todos: (t) => t.id } }
  * );
  *
- * // Wrap with Svelte reactivity (must pass same getItemId config)
- * const store = useSvelteReactivity(observableStore, {
- *   getItemId: { todos: (t) => t.id }
- * });
+ * // Wrap with Svelte reactivity (getItemId is automatically read from the store)
+ * const store = useSvelteReactivity(observableStore);
  *
  * // In a Svelte component:
  * // {store.count} - reactive (field-level)
@@ -438,8 +420,7 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
  * ```
  */
 export function useSvelteReactivity<T extends Record<string, unknown> & NonPrimitive>(
-	observableStore: ObservableStore<T>,
-	options?: ReactiveStoreOptions
+	observableStore: ObservableStore<T>
 ): ReactiveStoreWithFields<T> {
-	return new ReactiveStore(observableStore, options) as ReactiveStoreWithFields<T>;
+	return new ReactiveStore(observableStore) as ReactiveStoreWithFields<T>;
 }

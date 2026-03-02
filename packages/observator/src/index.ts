@@ -446,6 +446,15 @@ export class ObservableStore<T extends Record<string, unknown> & NonPrimitive> {
 		return {...this.state};
 	}
 
+	/**
+	 * Get the getItemId configuration for this store
+	 *
+	 * @returns The getItemId configuration or undefined if not set
+	 */
+	public getItemIdConfig(): GetItemIdConfig | undefined {
+		return this.options?.getItemId;
+	}
+
 	// ------------------------------------------------------------------------
 	// INTERNAL
 	// ------------------------------------------------------------------------
