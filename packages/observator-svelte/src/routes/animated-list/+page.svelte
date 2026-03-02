@@ -279,11 +279,7 @@
 						out:scale={{ duration: 200, start: 0.8 }}
 					>
 						<div class="item-content">
-							<input
-								type="checkbox"
-								checked={item.done}
-								onchange={() => toggleDone(item.id)}
-							/>
+							<input type="checkbox" checked={item.done} onchange={() => toggleDone(item.id)} />
 							<span class="item-text">{item.text}</span>
 							<span class="item-priority">#{item.priority}</span>
 						</div>
@@ -292,31 +288,29 @@
 								class="icon-btn"
 								onclick={() => moveToTop(item.id)}
 								title="Move to top"
-								disabled={store.items.indexOf(item) === 0}
-							>⏫</button>
+								disabled={store.items.indexOf(item) === 0}>⏫</button
+							>
 							<button
 								class="icon-btn"
 								onclick={() => moveUp(item.id)}
 								title="Move up"
-								disabled={store.items.indexOf(item) === 0}
-							>⬆️</button>
+								disabled={store.items.indexOf(item) === 0}>⬆️</button
+							>
 							<button
 								class="icon-btn"
 								onclick={() => moveDown(item.id)}
 								title="Move down"
-								disabled={store.items.indexOf(item) === store.items.length - 1}
-							>⬇️</button>
+								disabled={store.items.indexOf(item) === store.items.length - 1}>⬇️</button
+							>
 							<button
 								class="icon-btn"
 								onclick={() => moveToBottom(item.id)}
 								title="Move to bottom"
-								disabled={store.items.indexOf(item) === store.items.length - 1}
-							>⏬</button>
-							<button
-								class="icon-btn delete"
-								onclick={() => removeItem(item.id)}
-								title="Remove"
-							>❌</button>
+								disabled={store.items.indexOf(item) === store.items.length - 1}>⏬</button
+							>
+							<button class="icon-btn delete" onclick={() => removeItem(item.id)} title="Remove"
+								>❌</button
+							>
 						</div>
 					</li>
 				{/each}
@@ -328,7 +322,8 @@
 		<h2>ℹ️ How it works</h2>
 		<ul>
 			<li>
-				<strong>FLIP Animation:</strong> When items are reordered, Svelte's <code>animate:flip</code> creates smooth position transitions.
+				<strong>FLIP Animation:</strong> When items are reordered, Svelte's
+				<code>animate:flip</code> creates smooth position transitions.
 			</li>
 			<li>
 				<strong>Enter Animation:</strong> New items fly in from the left using <code>in:fly</code>.
@@ -337,10 +332,12 @@
 				<strong>Exit Animation:</strong> Removed items scale down using <code>out:scale</code>.
 			</li>
 			<li>
-				<strong>Keyed Each:</strong> Using <code>item.id</code> as the key ensures Svelte tracks individual items correctly.
+				<strong>Keyed Each:</strong> Using <code>item.id</code> as the key ensures Svelte tracks individual
+				items correctly.
 			</li>
 			<li>
-				<strong>Reactive Store:</strong> All operations go through <code>store.update()</code> which emits patches for fine-grained reactivity.
+				<strong>Reactive Store:</strong> All operations go through <code>store.update()</code> which emits
+				patches for fine-grained reactivity.
 			</li>
 		</ul>
 	</section>
@@ -356,7 +353,10 @@
 		max-width: 900px;
 		margin: 0 auto;
 		padding: 2rem;
-		font-family: system-ui, -apple-system, sans-serif;
+		font-family:
+			system-ui,
+			-apple-system,
+			sans-serif;
 	}
 
 	h1 {

@@ -12,9 +12,11 @@ export type EventName<K extends string> = `${K}:updated`;
  * Extract event names from state type
  * @example EventNames<{ a: string, b: number }> // 'a:updated' | 'b:updated'
  */
-export type EventNames<T extends Record<string, unknown>> = {
-	[K in keyof T]: EventName<K & string>;
-}[keyof T] | '*';
+export type EventNames<T extends Record<string, unknown>> =
+	| {
+			[K in keyof T]: EventName<K & string>;
+	  }[keyof T]
+	| '*';
 
 export type Key = string | number | symbol | object;
 

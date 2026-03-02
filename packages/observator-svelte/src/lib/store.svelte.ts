@@ -170,7 +170,9 @@ export class ReactiveStore<T extends Record<string, unknown> & NonPrimitive> {
 					// subscribed to removed items won't re-run. Users tracking structural changes
 					// should also access the array itself (e.g., iterate over it or access .length)
 					if (hasGetItemId && value !== undefined && value !== null) {
-						const itemId = (getItemIdFn as (value: any) => string | number | undefined | null)(value);
+						const itemId = (getItemIdFn as (value: any) => string | number | undefined | null)(
+							value
+						);
 						if (itemId !== undefined && itemId !== null) {
 							// Use item ID for keyed subscription
 							store.ensureKeyedSubscription(field, itemId);

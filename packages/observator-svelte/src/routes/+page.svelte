@@ -105,7 +105,7 @@
 <main>
 	<h1>ObservableStore + Svelte 5 Demo</h1>
 	<p>This demo showcases fine-grained reactivity using <code>useSvelteReactivity</code>.</p>
-	
+
 	<section class="demo-link">
 		<h2>🎬 Animated Array List Demo</h2>
 		<p>See array operations (add, remove, reorder) with smooth animations!</p>
@@ -162,12 +162,17 @@
 				</div>
 			{/each}
 		</div>
-		<p class="note">Each user card can react independently using automatic keyed subscriptions via proxy.</p>
+		<p class="note">
+			Each user card can react independently using automatic keyed subscriptions via proxy.
+		</p>
 	</section>
 
 	<section>
 		<h2>Raw ObservableStore Access</h2>
-		<p>Access underlying store via <code>store.raw</code> (same as original <code>observableStore</code>):</p>
+		<p>
+			Access underlying store via <code>store.raw</code> (same as original
+			<code>observableStore</code>):
+		</p>
 		<pre>{JSON.stringify(store.getState(), null, 2)}</pre>
 	</section>
 </main>
@@ -177,7 +182,10 @@
 		max-width: 800px;
 		margin: 0 auto;
 		padding: 2rem;
-		font-family: system-ui, -apple-system, sans-serif;
+		font-family:
+			system-ui,
+			-apple-system,
+			sans-serif;
 	}
 
 	section {
